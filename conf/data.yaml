@@ -1,0 +1,92 @@
+start_year: 2004
+end_year: 2024
+crs: 3310 # WGS 84 <=> EPSG: 4326 is not projected
+url_fires: https://services1.arcgis.com/jUJYIo9tSA7EHvfZ/arcgis/rest/services/California_Historic_Fire_Perimeters/FeatureServer/0
+url_storms: https://www.ncei.noaa.gov/pub/data/swdi/stormevents/csvfiles/
+url_prism: https://data.prism.oregonstate.edu/time_series/us/lt/800m/
+url_ca_ecoz4: https://dmap-prod-oms-edc.s3.us-east-1.amazonaws.com/ORD/Ecoregions/ca/ca_eco_l4.zip
+url_ca_ecoz3: https://dmap-prod-oms-edc.s3.us-east-1.amazonaws.com/ORD/Ecoregions/ca/ca_eco_l3.zip
+url_ca_state: https://data.ca.gov/dataset/e212e397-1277-4df3-8c22-40721b095f33/resource/3db1e426-fb51-44f5-82d5-a54d7c6e188b/download/ca_state.zip
+url_ca_county: https://data.ca.gov/dataset/e212e397-1277-4df3-8c22-40721b095f33/resource/b0007416-a325-4777-9295-368ea6b710e6/download/ca_counties.zip
+url_ca_road: https://caltrans-gis.dot.ca.gov/arcgis/rest/services/CHhighway/All_Roads/FeatureServer/0
+appeears:
+  # evi:
+  #   product: MOD13A1.061
+  #   layer: _500m_16_days_EVI
+  ndvi:
+    product: MYD13A1.061
+    layer: _500m_16_days_NDVI
+  # lai:
+  #   product: MOD15A2H.061
+  #   layer: Lai_500m
+  # landcover:
+  #   product: MCD12Q1.061
+  #   layer:
+  #     - LC_Type1
+  #     - LC_Type2
+  #     - LC_Type3
+  #     - LC_Type4
+  #     - LC_Type5
+  # dem:
+  #   product: NASADEM_NC.001 #ASTGTM_NC.003 #ASTGTM_NUMNC.003
+  #   layer: NASADEM_HGT #ASTER_GDEM_DEM
+landcover:
+  1:
+    name: IGBP
+    classes:
+      1: Evergreen Needleleaf Forests
+      2: Evergreen Broadleaf Forests
+      3: Deciduous Needleleaf Forests
+      4: Deciduous Broadleaf Forests
+      5: Mixed Forests
+      6: Closed Shrublands
+      7: Open Shrublands
+      8: Woody Savannas
+      9: Savannas
+      10: Grasslands
+      11: Permanent Wetlands
+      12: Croplands
+      13: Urban and Built-up Lands
+      14: Cropland/Natural Vegetation Mosaics
+      15: Permanent Snow and Ice
+      16: Barren
+      17: Water Bodies
+      255: Unclassified 
+      
+  2:
+    name: UMD
+    classes:
+      0: Water bodies
+      1: Evergreen Needleleaf Forests
+      2: Evergreen Broadleaf Forests
+      3: Deciduous Needleleaf Forests
+      4: Deciduous Broadleaf Forests
+      5: Mixed Forests
+      6: Closed Shrublands
+      7: Open Shrublands
+      8: Woody Savannas
+      9: Savannas
+      10: Grasslands
+      12: Croplands
+      13: Urban and Built-up Lands
+      15: Barrenv
+      255: Unclassified
+  3:
+    name: LAI
+    classes:
+      0: Water Bodies 
+      1: Grasslands
+      2: Shrublands
+      3: Broadleaf Croplands
+      4: Savannas
+      5: Evergreen Broadleaf Forests
+      6: Deciduous Broadleaf Forests
+      7: Evergreen Needleleaf Forests
+      8: Deciduous Needleleaf Forests
+      9: Unvegetated
+      10: Urban and Built-up Lands
+      255: 
+  4:
+    name: BGC
+  5:
+    name: PFT
