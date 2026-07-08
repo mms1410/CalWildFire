@@ -3,7 +3,6 @@ library(fs)
 library(here)
 library(tidyverse)
 #-------------------------------------------------------------------------------
-source("R/utils/functions.R")
 source("R/utils/data_queries.R")
 conf <- get_conf()
 crs <- st_crs(read_conf(conf, "crs"))
@@ -28,7 +27,6 @@ area <- fires |>
   select(id, date)
 
 fires <- st_centroid(fires)
-
 
 dir_create(dir_destination)
 st_write(fires, path(dir_destination, "calfire.gpkg"), append = FALSE)

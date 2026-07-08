@@ -3,12 +3,12 @@ library(here)
 library(sf)
 library(terra)
 #-------------------------------------------------------------------------------
-source("R/utils/functions.R")
+source("R/data/preprocess/utils.R")
 source("R/utils/data_queries.R")
 
 conf <- get_conf()
 crs <- st_crs(read_conf(conf, "crs"))
-ca <- read_sf_frame(keyword = "ca_state", sf_crs = crs)
+ca <- read_geodata(keyword = "ca_state", sf_crs = crs)
 #-------------------------------------------------------------------------------
 prism_folders <- dir_ls(path(here(),"data", "raw", "prism"))
 destination_folder <- path(here(), "data", "preprocessed")

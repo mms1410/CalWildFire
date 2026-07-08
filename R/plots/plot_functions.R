@@ -132,61 +132,54 @@ get_layer_ecoz <- function(sf_crs, keyword = "ecoz3", legend = FALSE, alpha = 0.
 }
 
 get_layer_ca <- function(sf_crs, alpha = 0.1, fill = "grey", ...) {
-  ca <- read_sf_frame(keyword = "ca_state", sf_crs)
+  ca <- read_geodata(keyword = "ca_state", sf_crs = sf_crs)
   geom_sf(data = ca, fill = fill, alpha = alpha)
 }
 
-get_layer <- function(data, data_key, ...){
-  
-  checkmate::assertClass(data, "sf")
-  checkmate::assertChoice(data_key, c("fire", "area"))
-  
-  switch(data_key,
-         "fire" = get_layer_fire(data),
-         "burntarea" = get_layer_burntarea(data),
-         "ecoz" = get_layer_ecoz(data),
-         "ca" = get_layer_ca(data)
-         )
-}
 #-------------------------------------------------------------------------------
-plot_lonlat <- function(frame, group_var = "lon", mean_width = 0.8, ylab = NULL, spaghetti = TRUE) {
+
+
+#'
+#' @frame
+#' @lonlat
+#' @ylab
+#'
+#'
+plot_lonlat <- function(frame, lonlat = "lon", ylab = NULL) {
   
   checkmate::assertDataFrame(frame)
-  checkmate::assertChoice(group_var, c("lon", "lat"))
-  checkmate::assertLogical(spaghetti)
+  checkmate::assertChoice(lonlat, c("lon", "lat"))
   checkmate::assert(all(c("lon", "lat", "date", "value") %in% colnames(frame)))
   
-  xlab <- ifelse(group_var == "lon", "Longitude(deg)", "Latitude(deg)")
+  xlab <- ifelse(lonlat == "lon", "Longitude(deg)", "Latitude(deg)")
   if (is.null(ylab)) {
     ylab <- deparse(substitute(frame))
-    #ylab <- sub("_long", "", ylab)
   }
-  
-  
-  if (!spaghetti) {
-    plt <- frame |>
-      group_by(.data[[group_var]])  |>
-      summarize(value = mean(value, na.rm = TRUE), .groups = "drop") |>
-      ggplot() +
-      geom_point(aes(x = .data[[group_var]], y = value)) +
-      labs(x = xlab, y = ylab)
-  } else {
+  single_date <- length(unique(frame$date)) == 1
+
+  if (!single_date) {
     plt <- frame |>
       mutate(year = year(date),
-             month = factor(month(date, label = TRUE, abbr = FALSE), levels = month.name)) |>
-      group_by(.data[[group_var]], month) |>
+              month = factor(lubridate::month(date, label = TRUE, abbr = FALSE), levels = month.name)) |>
+      group_by(.data[[lonlat]], month) |>
       summarize(value = mean(value, na.rm = TRUE), .groups = "drop") |>
       ggplot() +
-      geom_point(aes(x = .data[[group_var]], y = value,
-                     group = month, color = month), size = 0.5, shape = 3) +
+      geom_point(aes(x = .data[[lonlat]], y = value,
+                      group = month, color = month), size = 0.5, shape = 3) +
       month_colors() +
-      stat_summary(aes(x = .data[[group_var]], y = value, group = 1),
-                   fun = mean, geom = "line", color = "black", linewidth = mean_width) +
+      stat_summary(aes(x = .data[[lonlat]], y = value, group = 1),
+                    fun = mean, geom = "line", color = "black", linewidth = 0.8) +
       labs(x= xlab, y = ylab, color = "Month")
+  } else {
+    plt <- frame |>
+      group_by(.data[[lonlat]]) |>
+      summarize(value = mean(value, na.rm = TRUE), .groups = "drop")|>
+      ggplot() +
+      geom_line(aes(x = .data[[lonlat]], y = value), color = "black", linewidth = 0.8) +
+      labs(x = xlab, y = ylab)
   }
-  return(plt)
+  plt
 }
-
 
 #-------------------------------------------------------------------------------
 rastlyr_to_pngs <- function(raster, variable_name, destination_dir, legend_name = "Value", show_legend = TRUE, limits = NULL, levels = NULL) {
@@ -273,44 +266,168 @@ plot_and_save_raster <- function(raster, filename, dir_destination) {
 }
 
 
-plot_and_save_frame <- function(frame_name, destination_dir, variable_name = NULL) {
+plot_and_save_frame <- function(frame_name, destination_dir, variable_name = NULL, filename = NULL) {
   
   if (is.null(variable_name)) variable_name <- frame_name
+  if (is.null(filename)) filename <- variable_name
+  
   rast_frame <- read_rast_frame(frame_name)
+  single_date <- length(unique(rast_frame$date)) == 1
 
   p1 <- plot_lonlat(rast_frame, ylab = variable_name)
-  p2 <- plot_lonlat(rast_frame, ylab = variable_name, group_var = "lat")
+  p2 <- plot_lonlat(rast_frame, ylab = variable_name, lonlat = "lat")
   p1_y_range <- ggplot_build(p1)$layout$panel_params[[1]]$y$get_limits()
   p2_y_range <- ggplot_build(p2)$layout$panel_params[[1]]$y$get_limits()
-  y_range <- c(0, max(p1_y_range[[2]], p2_y_range[[2]]))
+  y_range_max <- max(p1_y_range[[2]], p2_y_range[[2]])
+  y_range_min <- min(p1_y_range[[1]], p2_y_range[[1]])
+  y_range <- c(y_range_min, y_range_max)
   p1 <- p1 + ylim(y_range)
   p2 <- p2 + ylim(y_range)
   
   
-  gg_save(paste0("lon_", variable_name, "_sphagetti"), plt = p1, destination_dir = destination_dir)
-  gg_save(paste0("lat_", variable_name, "_sphagetti"), plt = p2, destination_dir = destination_dir)
+  gg_save(paste0("lon_", filename, "_sphagetti"), plt = p1, destination_dir = destination_dir)
+  gg_save(paste0("lat_", filename, "_sphagetti"), plt = p2, destination_dir = destination_dir)
 
   q <- wrap_plots(p1, p2)
-  gg_save(paste0("patch_lonlat_", variable_name, "_sphagetti"), plt = q, destination_dir = destination_dir)
+  gg_save(paste0("patch_lonlat_", filename, "_sphagetti"), plt = q, destination_dir = destination_dir)
 
+  if (!single_date) {
+    p3 <- rast_frame |>
+      mutate(date = floor_date(date, "month")) |>
+      group_by(date) |>
+      summarize(
+        mean = mean(value),
+        median = median(value),
+        max = max(value),
+        min = min(value),
+        .groups = "drop"
+      ) |>
+      ggplot(aes(x = date)) +
+      geom_line(aes(y = mean, color = "mean")) +
+      geom_line(aes(y = median, color = "median")) +
+      geom_line(aes(y = max, color = "max")) +
+      geom_line(aes(y = min, color = "min")) +
+      labs(y = variable_name, x = "time", color = "")
+    gg_save(paste0("ts_", filename), plt = p3, destination_dir = destination_dir)
+    return(c(p1, p2, p3))
+  }
+  return(c(p1, p2))
+}
+
+
+set_raster_level_lc <- function(raster, type = "1") {
   
-  p3 <- rast_frame |>
-    mutate(date = floor_date(date, "month")) |>
-    group_by(date) |>
-    summarize(
-      mean = mean(value),
-      median = median(value),
-      max = max(value),
-      min = min(value),
-      .groups = "drop"
-    ) |>
-    ggplot(aes(x = date)) +
-    geom_line(aes(y = mean, color = "mean")) +
-    geom_line(aes(y = median, color = "median")) +
-    geom_line(aes(y = max, color = "max")) +
-    geom_line(aes(y = min, color = "min")) +
-    labs(y = variable_name, x = "time", color = "")
-  gg_save(paste0("ts_", variable_name), plt = p3, destination_dir = destination_dir)
+  levels_frame <- levels(raster)[[1]]
+  checkmate::assert("ID" %in% colnames(levels_frame))
   
-  c(p1, p2, p3)
+  lookup_table <- get_lc_lookup(type = type)
+  to_set <- levels_frame |> 
+    select(ID) |>
+    left_join(lookup_table, by = c("ID" = "value")) |>
+    rename(value = ID)
+  levels(raster) <- to_set
+  raster
+}
+
+
+get_lc_lookup <- function(type = "1") {
+  
+  checkmate::assertCharacter(type)
+  
+  # LC_Type1 — IGBP classification, range [1,17]
+  lc_type1 <- data.frame(
+    value = 1:17,
+    class = c(
+      "Evergreen Needleleaf Forests",
+      "Evergreen Broadleaf Forests",
+      "Deciduous Needleleaf Forests",
+      "Deciduous Broadleaf Forests",
+      "Mixed Forests",
+      "Closed Shrublands",
+      "Open Shrublands",
+      "Woody Savannas",
+      "Savannas",
+      "Grasslands",
+      "Permanent Wetlands",
+      "Croplands",
+      "Urban and Built-up Lands",
+      "Cropland/Natural Vegetation Mosaics",
+      "Permanent Snow and Ice",
+      "Barren",
+      "Water Bodies"))
+  
+  # LC_Type2 — University of Maryland (UMD) classification, range [0,15]
+  lc_type2 <- data.frame(
+    value = 0:15,
+    class = c(
+      "Water Bodies",
+      "Evergreen Needleleaf Forests",
+      "Evergreen Broadleaf Forests",
+      "Deciduous Needleleaf Forests",
+      "Deciduous Broadleaf Forests",
+      "Mixed Forests",
+      "Closed Shrublands",
+      "Open Shrublands",
+      "Woody Savannas",
+      "Savannas",
+      "Grasslands",
+      "Croplands",
+      "Urban and Built-up Lands",
+      "Cropland/Natural Vegetation Mosaics",
+      "Non-Vegetated Lands",
+      "Unclassified"))
+  
+  # LC_Type3 — LAI/fPAR classification (Myneni et al.), range [0,10]
+  lc_type3 <- data.frame(
+    value = 0:10,
+    class = c(
+      "Water Bodies",
+      "Grasslands",
+      "Shrublands",
+      "Broadleaf Croplands",
+      "Savannas",
+      "Evergreen Broadleaf Forests",
+      "Deciduous Broadleaf Forests",
+      "Evergreen Needleleaf Forests",
+      "Deciduous Needleleaf Forests",
+      "Non-Vegetated Lands",
+      "Urban and Built-up Lands"))
+  
+  # LC_Type4 — BIOME-BGC classification (Running et al.), range [0,8]
+  lc_type4 <- data.frame(
+    value = 0:8,
+    class = c(
+      "Water Bodies",
+      "Evergreen Needleleaf Vegetation",
+      "Evergreen Broadleaf Vegetation",
+      "Deciduous Needleleaf Vegetation",
+      "Deciduous Broadleaf Vegetation",
+      "Annual Broadleaf Vegetation",
+      "Annual Grass Vegetation",
+      "Non-Vegetated Land",
+      "Urban and Built-up Lands"))
+  
+  # LC_Type5 — Plant Functional Type classification (Bonan et al.), range [0,11]
+  lc_type5 <- data.frame(
+    value = 0:11,
+    class = c(
+      "Water Bodies",
+      "Evergreen Needleleaf Trees",
+      "Evergreen Broadleaf Trees",
+      "Deciduous Needleleaf Trees",
+      "Deciduous Broadleaf Trees",
+      "Shrub",
+      "Grass",
+      "Cereal Croplands",
+      "Broadleaf Croplands",
+      "Urban and Built-up Lands",
+      "Permanent Snow and Ice",
+      "Non-Vegetated Lands"))
+  
+  switch(type,
+         "1" = lc_type1,
+         "2" = lc_type2,
+         "3" = lc_type3,
+         "4" = lc_type4,
+         "5" = lc_type5)
 }

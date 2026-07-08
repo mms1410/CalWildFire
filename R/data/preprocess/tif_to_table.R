@@ -1,29 +1,51 @@
 library(zoo)
 library(terra)
+library(sf)
 library(tidyverse)
 library(fs)
+library(here)
 library(data.table)
 #-------------------------------------------------------------------------------
-fact <- 3
-#-------------------------------------------------------------------------------
-message(paste0("Aggregate rasters with factor ", fact))
-tif_files <- dir_ls(path("data", "preprocessed"), regexp = ".tif")
+source(path(here(), "R", "utils", "data_queries.R"))
+conf <- get_conf()
+crs <- st_crs(read_conf(conf, "crs"))
+categorical <- FALSE
+tif_files <- dir_ls(path("data", "preprocessed"), regexp = "\\.tif$", recurse = TRUE)
 destination_dir <- path("data", "preprocessed")
+crs_destination <- st_crs(4326)
+km_res <- 2 #2km resulution
+#-------------------------------------------------------------------------------
+#tif_files <- c("data/preprocessed/slope_NASADEM_HGT.tif" , "data/preprocessed/tmax.tif",  "data/preprocessed/vpdmax.tif")
 for (tif_file in tif_files) {
   filename <- str_extract(basename(tif_file), pattern = "(.*)(?=.tif)")
-  message(paste0("Load raster ", filename, "..."))
+  message(paste0("Process raster ", filename, "..."))
   raster <- rast(tif_file)
-  raster <- project(raster, "EPSG:4326")
-  message(paste0("Read data.table ", filename, "..."))
+  categorical <- all(is.factor(raster))
+  method <- ifelse(categorical, "near", "bilinear")
+  source_crs <- crs(raster, describe = TRUE)
+  # assure  geographic crs for lon/lat
+  if(source_crs$authority != "EPSG" || source_crs$code != 4326) {
+    message(paste0("   reproject source crs " , source_crs$name, " into destination crs ", crs_destination$input, "..."))
+    raster <- project(raster, "EPSG:4326", method = method)
+  }
+  target_resolution <- km_res / 111.32 # km in deg
+  current_resolution <- res(raster)[1]
+  if (current_resolution < target_resolution) {
+    message(paste0("   Current resolution ", current_resolution, " is smaller than ~", km_res, "km (deg) resolution..."))
+    template <- rast(ext(raster), resolution = target_resolution, crs = crs(raster)) #1km
+    raster <- resample(raster, template, method = method)
+    tmpFiles(current = FALSE, orphan = TRUE, remove = TRUE)
+    rm(template); gc()
+  }
+  message(paste0("   Read data.table..."))
   rastertable_wide <- raster |>
-    aggregate(fact = fact) |> # otw too large /memory issues
     as.data.table(xy = TRUE, na.rm =TRUE)
   setnames(rastertable_wide, old = c("x", "y"), new = c("lon", "lat"))
   fwrite(rastertable_wide, file = path(destination_dir, paste0(filename, "_wide.csv")))
-  rm(raster)
-  message(paste0("Melt ", basename(tif_file), "..."))
+  rm(raster);gc()
+  message(paste0("   Melt ", basename(tif_file), "..."))
   rastertable_long <- melt(rastertable_wide, id.vars = c("lon", "lat"),
                            variable.name = "date", value.name = "value")
   fwrite(rastertable_long, file = path(destination_dir, paste0(filename, "_long.csv")))
-  rm(rastertable_long)
+  rm(rastertable_long, rastertable_wide); gc()
 }

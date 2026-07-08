@@ -5,7 +5,6 @@ library(fs)
 #-------------------------------------------------------------------------------
 #                       operations on raster data
 #-------------------------------------------------------------------------------
-
 update_conf <- function(conf, key, value) {
   checkmate::assert(key %in% names(conf))
   conf[[key]] <- value
@@ -86,7 +85,7 @@ read_zip_raster <- function(filepath, pattern = "\\.tif$") {
 #'
 agg_raster <- function(raster, names_split, func = mean) {
   
-  checkmate::assert(inherits(func, "function"))
+  #checkmate::assert(inherits(func, "function"))
   checkmate::assert(inherits(raster, "SpatRaster"))
   checkmate::assertList(names_split)
                     
@@ -105,7 +104,6 @@ agg_raster <- function(raster, names_split, func = mean) {
 #-------------------------------------------------------------------------------
 #                       other
 #-------------------------------------------------------------------------------
-
 split_names <- function(raster_names, keyword = "m") {
   
   pattern <- switch(keyword,
@@ -201,12 +199,119 @@ query_raster_points <- function(raster, point_frame) {
   
 }
 
-
-
-get_centroid_boundary_distance <- function(geom_data){
-  centers <- st_centroid(geom_data)
-  distances <- st_distance(centers$geom, geom_data$geom)
-  assert(length(as.numeric(distance)) == nrow(geom_data))
-  d <- as.numeric(distances)
+set_raster_level_lc <- function(raster, type = "1") {
+  
+  levels_frame <- levels(raster)[[1]]
+  checkmate::assert("ID" %in% colnames(levels_frame))
+  
+  lookup_table <- get_lc_lookup(type = type)
+  to_set <- levels_frame |> 
+    select(ID) |>
+    left_join(lookup_table, by = c("ID" = "value")) |>
+    rename(value = ID)
+  levels(raster) <- to_set
+  raster
 }
 
+
+get_lc_lookup <- function(type = "1") {
+  
+  checkmate::assertCharacter(type)
+  
+  # LC_Type1 — IGBP classification, range [1,17]
+  lc_type1 <- data.frame(
+    value = 1:17,
+    class = c(
+      "Evergreen Needleleaf Forests",
+      "Evergreen Broadleaf Forests",
+      "Deciduous Needleleaf Forests",
+      "Deciduous Broadleaf Forests",
+      "Mixed Forests",
+      "Closed Shrublands",
+      "Open Shrublands",
+      "Woody Savannas",
+      "Savannas",
+      "Grasslands",
+      "Permanent Wetlands",
+      "Croplands",
+      "Urban and Built-up Lands",
+      "Cropland/Natural Vegetation Mosaics",
+      "Permanent Snow and Ice",
+      "Barren",
+      "Water Bodies"))
+  
+  # LC_Type2 — University of Maryland (UMD) classification, range [0,15]
+  lc_type2 <- data.frame(
+    value = 0:15,
+    class = c(
+      "Water Bodies",
+      "Evergreen Needleleaf Forests",
+      "Evergreen Broadleaf Forests",
+      "Deciduous Needleleaf Forests",
+      "Deciduous Broadleaf Forests",
+      "Mixed Forests",
+      "Closed Shrublands",
+      "Open Shrublands",
+      "Woody Savannas",
+      "Savannas",
+      "Grasslands",
+      "Croplands",
+      "Urban and Built-up Lands",
+      "Cropland/Natural Vegetation Mosaics",
+      "Non-Vegetated Lands",
+      "Unclassified"))
+  
+  # LC_Type3 — LAI/fPAR classification (Myneni et al.), range [0,10]
+  lc_type3 <- data.frame(
+    value = 0:10,
+    class = c(
+      "Water Bodies",
+      "Grasslands",
+      "Shrublands",
+      "Broadleaf Croplands",
+      "Savannas",
+      "Evergreen Broadleaf Forests",
+      "Deciduous Broadleaf Forests",
+      "Evergreen Needleleaf Forests",
+      "Deciduous Needleleaf Forests",
+      "Non-Vegetated Lands",
+      "Urban and Built-up Lands"))
+  
+  # LC_Type4 — BIOME-BGC classification (Running et al.), range [0,8]
+  lc_type4 <- data.frame(
+    value = 0:8,
+    class = c(
+      "Water Bodies",
+      "Evergreen Needleleaf Vegetation",
+      "Evergreen Broadleaf Vegetation",
+      "Deciduous Needleleaf Vegetation",
+      "Deciduous Broadleaf Vegetation",
+      "Annual Broadleaf Vegetation",
+      "Annual Grass Vegetation",
+      "Non-Vegetated Land",
+      "Urban and Built-up Lands"))
+  
+  # LC_Type5 — Plant Functional Type classification (Bonan et al.), range [0,11]
+  lc_type5 <- data.frame(
+    value = 0:11,
+    class = c(
+      "Water Bodies",
+      "Evergreen Needleleaf Trees",
+      "Evergreen Broadleaf Trees",
+      "Deciduous Needleleaf Trees",
+      "Deciduous Broadleaf Trees",
+      "Shrub",
+      "Grass",
+      "Cereal Croplands",
+      "Broadleaf Croplands",
+      "Urban and Built-up Lands",
+      "Permanent Snow and Ice",
+      "Non-Vegetated Lands"))
+
+  switch(type,
+         "1" = lc_type1,
+         "2" = lc_type2,
+         "3" = lc_type3,
+         "4" = lc_type4,
+         "5" = lc_type5)
+}

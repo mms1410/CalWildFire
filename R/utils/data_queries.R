@@ -38,31 +38,41 @@ read_conf <- function(conf, key) {
 #' @param filename For keyword 'gpkg' the full path to file.
 #' @param source Default folder where 'gpkg' files are located,
 #'
-read_sf_frame <- function(keyword = "gpkg", sf_crs = NULL, filename = NULL, source = path(here(), "data", "preprocessed")) {
+read_geodata <- function(keyword = "gpkg", sf_crs = NULL, filename = NULL, source = path(here(), "data", "preprocessed")) {
    #TODO: just ecoz
   if(!is.null(sf_crs)) checkmate::assertTRUE(inherits(sf_crs, "crs"))
-  checkmate::assertChoice(keyword, c("gpkg", "ca_state", "ecoz4", "ecoz3"))
+  allowed_keywords <- c("gpkg", "tif", "ca_state", "ecoz4", "ecoz3", "road_network")
+  checkmate::assertChoice(keyword, allowed_keywords)
   
-  if (keyword == "gpkg"){ # otw filename not used
+  # keyword needs filename
+  if (keyword == "gpkg" | keyword == "tif"){
     checkmate::assert(!is.null(filename))
     checkmate::assertString(filename)
+  
+  files_match <- dir_ls(source, recurse = TRUE, glob = paste0("*.", keyword))
+  if (is.empty(files_match)) stop(past0("No files of type ", keyword, " in ", source))
+  filename <- keep(files_match, ~str_detect(.x, filename))
+  } else {
+    filename <- switch(keyword, 
+                       "ecoz3" = paste0("/vsizip/",path(here(), "assets", "ca_ecoz3.zip")),
+                       "ecoz4" = paste0("/vsizip/",path(here(), "assets", "ca_ecoz4.zip")),
+                       "ca_state" = paste0("/vsizip/",path(here(), "assets", "ca_state.zip")),
+                       "road_network" = paste0(path(here(), "data", "raw", "caltrans.gpkg"))
+                       )
   }
-  filename <- switch(keyword,
-          # append '.gpkg' if necessary
-         "gpkg" = path(source, ifelse(str_detect(filename, regex("\\.gpkg$", ignore_case = TRUE)),
-                                    filename, paste0(filename, ".gpkg"))),
-         # handle zip files
-         "ecoz3" = paste0("/vsizip/",path(here(), "assets", "ca_ecoz3.zip")),
-         "ecoz4" = paste0("/vsizip/",path(here(), "assets", "ca_ecoz4.zip")),
-         "ca_state" = paste0("/vsizip/",path(here(), "assets", "ca_state.zip"))
-  )
+  checkmate::assertFileExists(sub("/vsizip/", "", filename)) # virtual file system
   
-  checkmate::assertFileExists(sub("/vsizip/", "", filename)) # virtual file system only
   
-  result <- st_read(filename, quiet = TRUE) |>
-    (\(dframe) if (is.null(sf_crs)) st_drop_geometry(dframe) else st_transform(dframe, crs = sf_crs))()
-  
-  return(result)
+  if (keyword == "tif") {
+    out <- rast(filename)
+    if(st_crs(out) != sf_crs) {
+      out <- project(out, sf_crs$wkt)
+    }
+  } else {
+    out <- st_read(filename, quiet = TRUE) |>
+      (\(dframe) if (is.null(sf_crs)) st_drop_geometry(dframe) else st_transform(dframe, crs = sf_crs))()
+  }
+  out
 }
 
 #' Read raster data
