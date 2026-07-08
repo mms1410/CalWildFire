@@ -8,27 +8,27 @@ url_ca_ecoz4: https://dmap-prod-oms-edc.s3.us-east-1.amazonaws.com/ORD/Ecoregion
 url_ca_ecoz3: https://dmap-prod-oms-edc.s3.us-east-1.amazonaws.com/ORD/Ecoregions/ca/ca_eco_l3.zip
 url_ca_state: https://data.ca.gov/dataset/e212e397-1277-4df3-8c22-40721b095f33/resource/3db1e426-fb51-44f5-82d5-a54d7c6e188b/download/ca_state.zip
 url_ca_county: https://data.ca.gov/dataset/e212e397-1277-4df3-8c22-40721b095f33/resource/b0007416-a325-4777-9295-368ea6b710e6/download/ca_counties.zip
-url_ca_road: https://caltrans-gis.dot.ca.gov/arcgis/rest/services/CHhighway/All_Roads/FeatureServer/0
+url_ca_road: https://caltrans-gis.dot.ca.gov/arcgis/rest/services/CHhighway/All_Roads/FeatureServer/0/query?outFields=*&where=1%3D1&f=geojson
 appeears:
-  # evi:
-  #   product: MOD13A1.061
-  #   layer: _500m_16_days_EVI
+  evi:
+    product: MOD13A1.061
+    layer: _500m_16_days_EVI
   ndvi:
     product: MYD13A1.061
     layer: _500m_16_days_NDVI
-  # lai:
-  #   product: MOD15A2H.061
-  #   layer: Lai_500m
-  # landcover:
-  #   product: MCD12Q1.061
-  #   layer:
-  #     - LC_Type1
-  #     - LC_Type2
-  #     - LC_Type3
-  #     - LC_Type4
-  #     - LC_Type5
-  # dem:
-  #   product: NASADEM_NC.001 #ASTGTM_NC.003 #ASTGTM_NUMNC.003
+  lai:
+    product: MOD15A2H.061
+    layer: Lai_500m
+  landcover:
+    product: MCD12Q1.061
+    layer:
+      - LC_Type1
+      - LC_Type2
+      - LC_Type3
+      - LC_Type4
+      - LC_Type5
+  dem:
+    product: NASADEM_NC.001 #ASTGTM_NC.003 #ASTGTM_NUMNC.003
   #   layer: NASADEM_HGT #ASTER_GDEM_DEM
 landcover:
   1:
