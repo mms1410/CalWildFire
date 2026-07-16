@@ -11,6 +11,7 @@ library(units)
 #-------------------------------------------------------------------------------
 source("R/utils/data_queries.R")
 source("R/plots/plot_functions.R")
+source("R/utils/geo_comp.R")
 #-------------------------------------------------------------------------------
 conf <- get_conf()
 crs <- st_crs(read_conf(conf, "crs"))
@@ -21,6 +22,12 @@ dir_fire <- path(here(), "assets", "plots", "fire")
 dir_misc <- path(here(), "assets", "plots", "misc")
 walk(list(dir_fire, dir_modis, dir_prism, dir_misc), dir_create)
 no_time <- TRUE
+
+plt_args_fire <- list(color = "red", shape = 19, size = 0.1, alpha = 0.6)
+plt_args_barea <- list(color = "grey", alpha = 0.8)
+gg_ca <- list(geom_sf(data = read_geodata(keyword = "ca_state", crs), color = "grey", alpha = 0.3))
+gg_ecoz <- list(geom_sf(data = select(read_geodata(keyword = "ecoz3", crs), c(geometry, NA_L3NAME)),
+                        aes(fill = NA_L3NAME), alpha = 0.6))
 
 subplot_margins <-  margin(t = 2, r = 2, b = 2, l = 2, unit = "pt")
 no_leg   <- theme(legend.position = "none")
@@ -40,32 +47,40 @@ fires <- fires |>
 barea <- read_geodata(sf_crs = crs, filename = "burntarea")
 barea <- barea # TODO: crop ca
 
+gg_fire <- list(do.call(geom_sf,
+                        c(list(data = transmute(fires, year = lubridate::year(date))),
+                          plt_args_fire)))
+gg_barea <- list(do.call(geom_sf, c(list(data = barea), plt_args_barea)))
+
+
 ggplot() +
-  get_layer_ca(crs) +
-  get_layer_fire(fires) +
-  facet_wrap(~ lubridate::year(date)) +
+  gg_ca +
+  gg_fire +
+  facet_wrap(~year) +
   theme(axis.ticks = element_blank(), axis.text = element_blank(), aspect.ratio = 1)
 gg_save("point_fires_facet_year", destination_dir = dir_fire, width = 7, height = 10)
 
 
 plt_point_fires_barea_total <- ggplot() +
-  get_layer_ca(crs) +
-  get_layer_barea(barea, alpha = 0.8) +
-  get_layer_fire(fires, alpha = 0.2) +
-  xlab("Longitude") +
-  ylab("Latitude")
-plt_point_fires_barea_total
-gg_save("point_fires_barea_total", destination_dir = dir_fire)
+  gg_ca +
+  gg_barea +
+  gg_fire +
+  labs(x = "Longitude", y = "Latitude")
+gg_save("point_fires_barea_total", plt = plt_point_fires_barea_total, destination_dir = dir_fire)
 
-for (y in year(fires$date) |> unique()) {
+for (yr in year(fires$date) |> unique()) {
   ggplot() +
-    get_layer_ca(crs) +
-    get_layer_fire(filter(fires, year(date) == y), alpha = 0.9) +
-    get_layer_barea(filter(barea, year(date) == y), alpha = 0.7) +
-    xlab("Longitude") +
-    ylab("Latitude") +
-    ggtitle(y)
-gg_save(paste0("point_fires_", y), destination_dir = dir_fire)
+    gg_ca +
+    do.call(geom_sf,
+            c(list(data = filter(barea, lubridate::year(date) == yr)), plt_args_barea)) + 
+    do.call(geom_sf,
+            c(list(data = fires |>
+                     transmute(year = lubridate::year(date)) |>
+                     filter(year == yr)),
+              plt_args_fire)) +
+    labs(x = "Longitude", y = "Latitude") + 
+    ggtitle(yr)
+gg_save(paste0("point_fires_", yr), destination_dir = dir_fire)
 }
 gifski(dir_ls(dir_fire, regexp = "point_fires_\\d{4}"),
        path(dir_fire, "point_fires.gif"),
@@ -73,18 +88,19 @@ gifski(dir_ls(dir_fire, regexp = "point_fires_\\d{4}"),
        width = 800,
        height = 600)
 
+
 ggplot() +
-  get_layer_ca(crs) +
-  get_layer_fire(fires, mark = log1p(fires$area), size = 0.3, alpha = 0.4) +
-  scale_color_viridis_c(option = "inferno", trans = "log", name = "log(1+area)") +
+  gg_ca +
+  geom_sf(data = fires, aes(color = log1p(area)), size = 0.1, alpha = 0.7) +
+  scale_color_viridis_c(option = "inferno", trans = "log", direction = -1, name = "log(1+area)") +
   xlab("Longitude") +
   ylab("Latitude")
 gg_save("point_fires_total_mark", destination_dir = dir_fire)
 
+
 ggplot() +
-  get_layer_fire(fires) +
-  #get_layer(fires, "fire") +
-  get_layer_ecoz(crs, legend = TRUE) +
+  gg_fire +
+  gg_ecoz + 
   theme(legend.position = "right", legend.text = element_text(size = 8)) +
   labs(fill = "") +
   xlab("Longitude") +
@@ -131,15 +147,12 @@ plt_ts_cummulative_count_d <- fires |>
 plt_ts_cummulative_count_d
 gg_save("ts_cummulative_count_d", destination_dir = dir_fire)
 
-
 plot_grid(plt_point_fires_barea_total + theme(aspect.ratio = 1),
           plt_ts_fire_counts_m + theme(aspect.ratio = 1),
           nrow = 1, ncol = 2,
           align = "hv", axis = "tblr")
 gg_save("patch_count_ts", destination_dir = dir_fire)
 
-## time series total wildfires ecozone
-# TODO:count > 100 Cal High North dominating scale, to bottom with own scale?
 fires |>
   add_layer(select(read_geodata(keyword = "ecoz3", crs), "US_L3NAME")) |>
   st_drop_geometry() |>
@@ -215,20 +228,22 @@ tmp_vpdmax <- plot_and_save_frame("vpdmax", dir_prism)
 tmp_tmax <- plot_and_save_frame("tmax", dir_prism)
 
 plot_list <- list(tmp_ppt[[1]] + no_legxax ,
-                  tmp_ppt[[2]] + no_legyax ,
+                  tmp_ppt[[2]] + no_legax ,
                   tmp_vpdmax[[1]] + no_legxax ,
-                  tmp_vpdmax[[2]] + no_legyax ,
+                  tmp_vpdmax[[2]] + no_legax ,
                   tmp_tmax[[1]] + no_leg ,
                   tmp_tmax[[2]] + no_legyax )
 
-
-# TODO: axis
 plot_grid(plotlist = plot_list, nrow = 3, ncol = 2)
 gg_save("patch_lonlat_prism", destination_dir = dir_prism, set_theme = FALSE)
 
 rm(list = ls(pattern = "^tmp"))
 rm(list = ls(pattern = "^plt"))
 gc()
+
+plot_rast_agg("ppt", crs, dir_prism)
+plot_rast_agg("vpdmax", crs, dir_prism)
+plot_rast_agg("tmax", crs, dir_prism)
 #-------------------------------------------------------------------------------
 #                                 MODIS
 #-------------------------------------------------------------------------------
@@ -290,29 +305,31 @@ plt_slope <- ggplot() +
   labs(x = "Longitude", y = "Latitude")
 gg_save("slope", destination_dir = dir_modis)
 
-# TODO color
 plt_ecoz <- ggplot () +
-  get_layer_ecoz(crs, legend = TRUE) +
+  geom_sf(data = select(read_geodata(keyword = "ecoz3", sf_crs = crs), c(geometry, "NA_L3NAME")),
+          aes(fill = NA_L3NAME)) + 
   labs(x = "Longitude", y = "Latitude") +
   guides(fill=guide_legend(title="")) +
   theme(legend.position = "bottom",
         legend.text = element_text(size=7),
         legend.title = element_text(size=9))
-plt_ecoz
 gg_save("ecozone", plt = plt_ecoz, destination_dir = dir_misc)
 
-
 plot_grid(plot_grid(plt_dem + theme(legend.position = "none", aspect.ratio = 1),
-                    plt_ecoz + theme(legend.position = "none", aspect.ratio = 1),
+                    plt_ecoz + theme(legend.position = "none", aspect.ratio = 1) + labs(y = ""),
                     nrow = 1, ncol = 2),
           plot_grid(get_legend(plt_dem + theme(legend.position = "right", legend.justification = "right")),
                     get_legend(plt_ecoz + theme(legend.position = "bottom", legend.justification = "left")),
                     nrow = 1, ncol = 2, rel_widths = c(1, 6.5)),
           nrow = 2, ncol = 1, rel_heights = c(1, 0.4))
 gg_save("patch_modis_demecoz", destination_dir = dir_modis)
+
 rm(list = ls(pattern = "^tmp"))
 rm(list = ls(pattern = "^plt"))
 gc()
+
+plot_rast_agg("evi", crs, dir_modis)
+plot_rast_agg("lai", crs, dir_modis)
 #-------------------------------- Landcover ------------------------------------
 plot_and_save_lc <- function(type) {
   filename <- paste0("LC_Type", type)
@@ -416,9 +433,17 @@ plt_road_raster <- ggplot() +
 gg_save("road_raster", plt = plt_road_raster, destination_dir = dir_misc)
 
 
-plot_grid(plt_road_network + theme(aspect.ratio = 1),
-          plt_road_raster + theme(aspect.ratio = 1) + no_legyax,
-          plt_road_rast_hist + theme(aspect.ratio = 1),
-          plt_road_rast_hist_trafo + theme(aspect.ratio = 1),
-          nrow = 2)
+plot_grid(plot_grid(plt_road_network + theme(aspect.ratio = 1),
+                    plt_road_raster + theme(aspect.ratio = 1) + no_legyax,
+                    plt_road_rast_hist + theme(aspect.ratio = 1),
+                    plt_road_rast_hist_trafo + theme(aspect.ratio = 1) +  no_legyax,
+                    nrow = 2, ncol = 2,
+                    rel_widths = c(1, 1)),
+          get_legend(plt_road_raster +
+                       theme(legend.position = "bottom",
+                             legend.direction = "horizontal",
+                             #legend.justification = "right",
+                             legend.box.margin = margin(t = -10, r = 0, b = 0, l = 0))),
+          nrow = 2, ncol = 1,
+          rel_heights = c(1, 0.2))
 gg_save("patch_road", destination_dir = dir_misc)

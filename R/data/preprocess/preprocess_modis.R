@@ -35,6 +35,7 @@ for (variable in modis_variables) {
     checkmate::assertFile(files)
     dates <- parse_string(files, parserlist = parsers_modis)
     yrs <- unique(year(dates))
+    
     filenames_yrs <- path(dir_dest, paste0(variable, "_", layer, "_", yrs, ".tif"))
     for (idx in seq_along(yrs)) {
       message(paste0("    Process year ", yrs[idx], "..."))

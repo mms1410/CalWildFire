@@ -31,7 +31,10 @@ for(folder in prism_folders) {
   names(raster_total) <- dates
   time(raster_total) <- dates
   
+  idx <- (year(dates) >= read_conf(conf, "start_year")) & (year(dates) <= read_conf(conf, "end_year"))
+  raster_total <- raster_total[[idx]]
+  
   rm(rasters)
   writeRaster(raster_total, filename = filename, overwrite = TRUE)
-  message(paste0("    Wrote ", filename))
+  message("Done!")
 }

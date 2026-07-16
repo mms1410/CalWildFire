@@ -85,7 +85,6 @@ read_zip_raster <- function(filepath, pattern = "\\.tif$") {
 #'
 agg_raster <- function(raster, names_split, func = mean) {
   
-  #checkmate::assert(inherits(func, "function"))
   checkmate::assert(inherits(raster, "SpatRaster"))
   checkmate::assertList(names_split)
                     

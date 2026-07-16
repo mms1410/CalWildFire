@@ -1,4 +1,5 @@
 library(ggplot2)
+library(cowplot)
 library(gifski)
 library(tidyverse)
 library(tidyterra)
@@ -37,6 +38,31 @@ month_colors <- function() {
   ggsci::scale_color_d3(palette = "category20")
 }
 #-------------------------------------------------------------------------------
+#' Save last plot as png
+#'
+#' @param filename name of png file (.png will be added)
+#' @param desintation_dir location where png image will be stored
+#'
+gg_save <- function(filename, plt = get_last_plot(), destination_dir = path(here(), "assets", "plots"), set_theme = TRUE, dpi = 300, width = 8, height = 8) {
+  
+  dir_create(destination_dir)
+  #p <- last_plot()
+  if (set_theme) {
+    plt <- plt +
+      theme(aspect.ratio = 1,
+            plot.margin = margin(0, 0, 0, 0, "pt"),
+            legend.margin = margin(0, 0, 0, 0, "pt"),
+            legend.box.margin = margin(0, 0, 0, 0, "pt"))
+  }
+  
+  ggsave(path(destination_dir, paste0(filename, ".png")),
+         plot = plt,
+         dpi = dpi,
+         width = width,
+         height = height,
+         units = "in")
+}
+
 png_save <- function(plot_expr,
                      filename,
                      destination_dir = path(here(), "assets", "plots"),
@@ -57,86 +83,38 @@ png_save <- function(plot_expr,
   
   eval.parent(substitute(plot_expr))
 }
-
-#' Save last plot as png
-#'
-#' @param filename name of png file (.png will be added)
-#' @param desintation_dir location where png image will be stored
-#'
-gg_save <- function(filename, plt = get_last_plot(), destination_dir = path(here(), "assets", "plots"), set_theme = TRUE, dpi = 300, width = 8, height = 8) {
-  
-  dir_create(destination_dir)
-  #p <- last_plot()
-  if (set_theme) {
-    plt <- plt +
-      theme(aspect.ratio = 1,
-            plot.margin = margin(0, 0, 0, 0, "pt"),
-            legend.margin = margin(0, 0, 0, 0, "pt"),
-            legend.box.margin = margin(0, 0, 0, 0, "pt"))
-  }
-    
-  ggsave(path(destination_dir, paste0(filename, ".png")),
-         plot = plt,
-         dpi = dpi,
-         width = width,
-         height = height,
-         units = "in")
-}
 #-------------------------------------------------------------------------------
-get_layer_fire <- function(fires, color = "red", shape = 19, size = 0.1, alpha = 0.4,
-                            mark = NULL,  ...) {
-  if (is.null(mark)) {
-    return(geom_sf(
-      data = fires,
-      color = color,
-      shape = shape,
-      size = size,
-      alpha = alpha))
-  } else {
-    return(geom_sf(
-      data = fires,
-      size = size,
-      shape = shape,
-      aes(color = {{mark}}),
-      alpha = alpha))
-  }
-}
-
-get_layer_barea <- function(barea, color = "grey", alpha = 0.5, ...) {
-  geom_sf(data = barea,
-          color = color,
-          alpha = alpha)
-}
 
 
-get_layer_ecoz <- function(sf_crs, keyword = "ecoz3", legend = FALSE, alpha = 0.3, variable = "NA_L3NAME", ...) {
+#'
+#' @tif_name
+#' @sf_crs
+#' @dir_dest
+#' @legend_title
+#'
+plot_rast_agg <- function(tif_name, sf_crs, dir_dest, legend_title = NULL){
   
-  
-  if (keyword == "ecoz4") {
-    filename <- "ca_ecoz4.zip"
-    columns <- "US_L4NAME"
-  } else if (keyword == "ecoz3") {
-    filename <- "ca_ecoz3.zip"
-    columns <- "US_L3NAME"
-  } else {
-    stop("Unknown keyword")
+  if(is.null(legend_title)) {
+    legend_title <- tif_name
   }
-  ca_ecoz <- st_read(paste0("/vsizip/",path(here(), "assets", filename)),quiet = TRUE) |>
-    select(all_of(columns)) |>
-    st_transform(crs = sf_crs)
-    
-  geom_sf(data = ca_ecoz,
-          aes(fill = .data[[columns]]),
-          alpha = alpha,
-          show.legend = legend)
+  raster <- read_geodata(keyword = "tif", sf_crs = sf_crs, filename = tif_name)
+  
+  plt_patch_y <- ggplot() +
+    geom_spatraster(data = agg_raster(raster, 
+                                      split(names(raster), lubridate::year(names(raster))),
+                                      func = "median")) +
+    raster_theme(legend_title, facet = TRUE)
+  filename_y <- paste0("patch_", tif_name, "_y")
+  gg_save(filename_y, plt = plt_patch_y, destination_dir = dir_dest)
+  
+  plt_patch_m <- ggplot() +
+    geom_spatraster(data = agg_raster(raster, split(names(raster), lubridate::month(names(raster), label = TRUE)))) +
+    raster_theme(legend_title, facet = TRUE)
+  filename_m <- paste0("patch_", tif_name, "_m")
+  gg_save(filename_m, plt = plt_patch_m,  destination_dir = dir_dest)
 }
 
-get_layer_ca <- function(sf_crs, alpha = 0.1, fill = "grey", ...) {
-  ca <- read_geodata(keyword = "ca_state", sf_crs = sf_crs)
-  geom_sf(data = ca, fill = fill, alpha = alpha)
-}
 
-#-------------------------------------------------------------------------------
 
 
 #'
@@ -181,7 +159,11 @@ plot_lonlat <- function(frame, lonlat = "lon", ylab = NULL) {
   plt
 }
 
-#-------------------------------------------------------------------------------
+#'
+#'
+#'
+#'
+#'
 rastlyr_to_pngs <- function(raster, variable_name, destination_dir, legend_name = "Value", show_legend = TRUE, limits = NULL, levels = NULL) {
   
   for (lyr_name in names(raster)) {
@@ -232,26 +214,30 @@ png_bins_to_gif <- function(bin_list, destination_dir, filenames = NULL) {
   }
 }
 
-#-------------------------------------------------------------------------------
-plot_ripleyk <- function(source = path(here(), "assets", "ripkenv_sim.rds"),
-                         framenames = c("r", "Estimated", "Theoretical"), cols_to_drop = c("lo", "hi")) {
-  
-  fv_frame <- readRDS(source)
-    if (!is.null(cols_to_drop)) {
-      fv_frame <- fv_frame |>
-        select(-all_of(cols_to_drop))
-    }
-  if (!is.null(framenames)) {
-    names(fv_frame) <- framenames
+raster_theme <- function(name = "", guide = "colorbar", categorical = FALSE, facet = FALSE) {
+  # Determine color scale
+  thm <- if (categorical) {
+    scale_fill_d3(palette = "category20", na.value = "transparent", na.translate = FALSE, name = name)
+  } else {
+    scale_fill_viridis_c(na.value = NA, name = name, guide = guide)
   }
-  fv_frame |>
-    pivot_longer(cols = -r, names_to = "variable", values_to = "value") |>
-    ggplot() +
-    ylab("K(r)") +
-    geom_line(aes(x = r, y = value, color = variable)) +
-    labs(color = NULL)
+  
+  # Base components
+  components <- list(
+    thm,
+    theme_minimal(),
+    labs(x = "Longitude", y = "Latitude")
+  )
+  
+  # Append faceting and specific axis adjustments if requested
+  if (facet) {
+    components <- c(list(facet_wrap(~lyr)), components)
+    components <- c(components, list(theme(axis.text.x = element_text(angle = 45, hjust = 1))))
+  }
+  components
 }
-#-------------------------------------------------------------------------------
+
+
 plot_and_save_raster <- function(raster, filename, dir_destination) {
   
   plt <- ggplot() +
@@ -288,7 +274,7 @@ plot_and_save_frame <- function(frame_name, destination_dir, variable_name = NUL
   gg_save(paste0("lon_", filename, "_sphagetti"), plt = p1, destination_dir = destination_dir)
   gg_save(paste0("lat_", filename, "_sphagetti"), plt = p2, destination_dir = destination_dir)
 
-  q <- wrap_plots(p1, p2)
+  q <- cowplot::plot_grid(p1, p2, nrow = 1, ncol = 2)
   gg_save(paste0("patch_lonlat_", filename, "_sphagetti"), plt = q, destination_dir = destination_dir)
 
   if (!single_date) {
