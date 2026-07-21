@@ -8,6 +8,7 @@ library(fs)
 library(lubridate)
 library(sf)
 library(ggsci)
+library(magick)
 #-------------------------------------------------------------------------------
 theme_set(theme_light())
 theme_ecoregion <- theme(
@@ -43,7 +44,7 @@ month_colors <- function() {
 #' @param filename name of png file (.png will be added)
 #' @param desintation_dir location where png image will be stored
 #'
-gg_save <- function(filename, plt = get_last_plot(), destination_dir = path(here(), "assets", "plots"), set_theme = TRUE, dpi = 300, width = 8, height = 8) {
+gg_save <- function(filename, plt = get_last_plot(), destination_dir = path(here(), "assets", "plots"), set_theme = TRUE, trim = TRUE, dpi = 300, width = 8, height = 8) {
   
   dir_create(destination_dir)
   #p <- last_plot()
@@ -55,12 +56,20 @@ gg_save <- function(filename, plt = get_last_plot(), destination_dir = path(here
             legend.box.margin = margin(0, 0, 0, 0, "pt"))
   }
   
-  ggsave(path(destination_dir, paste0(filename, ".png")),
+  out_path <- path(destination_dir, paste0(filename, ".png"))
+  
+  ggsave(out_path,
          plot = plt,
          dpi = dpi,
          width = width,
          height = height,
          units = "in")
+  
+  if (trim) {
+    img <- image_read(out_path)
+    img <- image_trim(img)
+    image_write(img, out_path)
+  }
 }
 
 png_save <- function(plot_expr,

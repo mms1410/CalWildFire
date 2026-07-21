@@ -5,6 +5,7 @@ library(sf)
 library(ggplot2)
 library(tidyverse)
 library(cowplot)
+library(patchwork)
 library(tidyterra)
 library(scales)
 library(units)
@@ -153,19 +154,19 @@ plot_grid(plt_point_fires_barea_total + theme(aspect.ratio = 1),
           align = "hv", axis = "tblr")
 gg_save("patch_count_ts", destination_dir = dir_fire)
 
-fires |>
-  add_layer(select(read_geodata(keyword = "ecoz3", crs), "US_L3NAME")) |>
-  st_drop_geometry() |>
-  mutate(ym = floor_date(date, "month"), ecoz = US_L3NAME) |>
-  filter(!is.na(ecoz)) |>
-  select(ym, ecoz)|>
-  group_by(ecoz, ym) |>
-  summarize(count = n(), .goups = "drop") |>
-  ggplot() +
-  geom_col(aes(x = ym, y = count)) +
-  xlab("Time") +
-  facet_wrap(~ecoz)
-gg_save("ts_fire_facet_ecoz", destination_dir = dir_fire)
+# fires |>
+#   add_layer(select(read_geodata(keyword = "ecoz3", crs), "US_L3NAME")) |>
+#   st_drop_geometry() |>
+#   mutate(ym = floor_date(date, "month"), ecoz = US_L3NAME) |>
+#   filter(!is.na(ecoz)) |>
+#   select(ym, ecoz)|>
+#   group_by(ecoz, ym) |>
+#   summarize(count = n(), .goups = "drop") |>
+#   ggplot() +
+#   geom_col(aes(x = ym, y = count)) +
+#   xlab("Time") +
+#   facet_wrap(~ecoz)
+# gg_save("ts_fire_facet_ecoz", destination_dir = dir_fire)
 
 fires |>
   st_drop_geometry() |>
@@ -195,14 +196,14 @@ plt_heat_fires_count
 gg_save("heat_fires_count", destination_dir = dir_fire)
 
 
-plot_grid(plot_grid(plt_ts_cummulative_count_d + theme(aspect.ratio = 1,plot.margin = subplot_margins),
-                    plt_ts_fire_counts_m + theme(aspect.ratio = 1, plot.margin = subplot_margins),
-                    plt_heat_fires_count + theme(legend.position = "none", aspect.ratio = 1, plot.margin = subplot_margins),
-                    plt_point_fires_barea_total + theme(aspect.ratio = 1, plot.margin = subplot_margins),
-                    nrow = 2, ncol = 2),
-          get_legend(plt_heat_fires_count + theme(legend.position = "bottom", legend.justification = "left")),
-          nrow = 2, ncol = 1, rel_heights = c(1, 0.1))
+wrap_plots(plt_ts_cummulative_count_d,
+           plt_ts_fire_counts_m,
+           plt_heat_fires_count,
+           plt_point_fires_barea_total,
+           nrow = 2, ncol = 2) +
+  plot_layout(guides = "collect", widths = c(1, 1), heights = c(1, 1))
 gg_save("patch_cumcount_count_heat_point", destination_dir = dir_fire)
+
 
 
 plot_grid(plot_grid(plt_ts_cummulative_count_d + theme(aspect.ratio = 1,plot.margin = subplot_margins),
@@ -315,13 +316,15 @@ plt_ecoz <- ggplot () +
         legend.title = element_text(size=9))
 gg_save("ecozone", plt = plt_ecoz, destination_dir = dir_misc)
 
-plot_grid(plot_grid(plt_dem + theme(legend.position = "none", aspect.ratio = 1),
-                    plt_ecoz + theme(legend.position = "none", aspect.ratio = 1) + labs(y = ""),
-                    nrow = 1, ncol = 2),
-          plot_grid(get_legend(plt_dem + theme(legend.position = "right", legend.justification = "right")),
-                    get_legend(plt_ecoz + theme(legend.position = "bottom", legend.justification = "left")),
-                    nrow = 1, ncol = 2, rel_widths = c(1, 6.5)),
-          nrow = 2, ncol = 1, rel_heights = c(1, 0.4))
+
+tmp_theme <- theme(aspect.ratio = 1, legend.text = element_text(size = 7),
+                   legend.spacing.x = unit(0.1, "cm"))
+wrap_plots(plt_dem + tmp_theme + labs(fill = NULL) +
+             guides(fill = guide_legend(ncol = 1, byrow = TRUE)),
+           plt_ecoz + tmp_theme + labs(y = "", fill = NULL) + 
+             guides(fill = guide_legend(nrow = 4, byrow =TRUE)),
+           ncol = 2, guides = "collect") &
+  theme(legend.position = "bottom", legend.justification = "left")
 gg_save("patch_modis_demecoz", destination_dir = dir_modis)
 
 rm(list = ls(pattern = "^tmp"))
@@ -433,17 +436,11 @@ plt_road_raster <- ggplot() +
 gg_save("road_raster", plt = plt_road_raster, destination_dir = dir_misc)
 
 
-plot_grid(plot_grid(plt_road_network + theme(aspect.ratio = 1),
-                    plt_road_raster + theme(aspect.ratio = 1) + no_legyax,
-                    plt_road_rast_hist + theme(aspect.ratio = 1),
-                    plt_road_rast_hist_trafo + theme(aspect.ratio = 1) +  no_legyax,
-                    nrow = 2, ncol = 2,
-                    rel_widths = c(1, 1)),
-          get_legend(plt_road_raster +
-                       theme(legend.position = "bottom",
-                             legend.direction = "horizontal",
-                             #legend.justification = "right",
-                             legend.box.margin = margin(t = -10, r = 0, b = 0, l = 0))),
-          nrow = 2, ncol = 1,
-          rel_heights = c(1, 0.2))
+
+wrap_plots(plt_road_network,
+           plt_road_raster + labs(y = ""),
+           plt_road_rast_hist,
+           plt_road_rast_hist_trafo,
+           nrow = 2, ncol = 2) +
+  plot_layout(widths = c(1, 1), heights = c(1, 1))
 gg_save("patch_road", destination_dir = dir_misc)
