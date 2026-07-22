@@ -228,23 +228,27 @@ tmp_ppt <- plot_and_save_frame("ppt", dir_prism)
 tmp_vpdmax <- plot_and_save_frame("vpdmax", dir_prism)
 tmp_tmax <- plot_and_save_frame("tmax", dir_prism)
 
-plot_list <- list(tmp_ppt[[1]] + no_legxax ,
+plot_list <- list(tmp_ppt[[1]] + no_xax ,
                   tmp_ppt[[2]] + no_legax ,
                   tmp_vpdmax[[1]] + no_legxax ,
                   tmp_vpdmax[[2]] + no_legax ,
                   tmp_tmax[[1]] + no_leg ,
                   tmp_tmax[[2]] + no_legyax )
 
-plot_grid(plotlist = plot_list, nrow = 3, ncol = 2)
+wrap_plots(plot_list, nrow = 3, ncol = 2) +
+  plot_layout(guides = "collect", widths = c(1, 1), heights = c(1, 1))
+
 gg_save("patch_lonlat_prism", destination_dir = dir_prism, set_theme = FALSE)
 
 rm(list = ls(pattern = "^tmp"))
 rm(list = ls(pattern = "^plt"))
 gc()
 
-plot_rast_agg("ppt", crs, dir_prism)
-plot_rast_agg("vpdmax", crs, dir_prism)
-plot_rast_agg("tmax", crs, dir_prism)
+if (!no_time) {
+  plot_rast_agg("ppt", crs, dir_prism)
+  plot_rast_agg("vpdmax", crs, dir_prism)
+  plot_rast_agg("tmax", crs, dir_prism)
+}
 #-------------------------------------------------------------------------------
 #                                 MODIS
 #-------------------------------------------------------------------------------
@@ -255,34 +259,37 @@ tmp_dem <- plot_and_save_frame("dem_NASADEM_HGT", variable_name = "dem", dir_mod
 tmp_aspect <- plot_and_save_frame("aspect_NASADEM_HGT", variable_name = "aspect(deg)", filename = "aspect", dir_modis)
 tmp_slope <- plot_and_save_frame("slope_NASADEM_HGT", variable_name = "slope(deg)", filename = "slope", dir_modis)
 
-plot_list <- list(tmp_dem[[1]] + no_legxax ,
+plot_list <- list(tmp_dem[[1]] + no_xax ,
                   tmp_dem[[2]] + no_legax ,
                   tmp_aspect[[1]] + no_legxax ,
                   tmp_aspect[[2]] + no_legax ,
                   tmp_slope[[1]] + no_legxax ,
                   tmp_slope[[2]] + no_legax ,
-                  tmp_lai[[1]] + no_legxax ,
+                  tmp_lai[[1]] + no_xax ,
                   tmp_lai[[2]] + no_legax ,
                   tmp_evi[[1]] + no_leg ,
                   tmp_evi[[2]] + no_legyax )
 
 
-plot_grid(plotlist = plot_list, nrow = 5, ncol = 2)
+wrap_plots(plot_list, nrow = 5, ncol = 2) +
+  plot_layout(guides = "collect", widths = c(1, 1), heights = c(1, 1))
 gg_save("patch_lonlat_modis_all", destination_dir = dir_modis, set_theme = FALSE)
 
 
-plot_grid(plotlist = tail(plot_list, 4), nrow = 2, ncol = 2)
-gg_save("patch_lonlat_modis_evilai", destination_dir = dir_modis)
+wrap_plots(tail(plot_list, 4), nrow = 2, ncol = 2, axes = "collect") +
+  plot_layout(widths = c(1,1), heights = c(1,1), guides = "collect")
+gg_save("patch_lonlat_modis_evilai", destination_dir = dir_modis, set_theme = FALSE)
 
 
-plot_list <- list(tmp_dem[[1]] + no_legxax,
-                  tmp_dem[[2]] + no_legax,
-                  tmp_aspect[[1]] + no_legxax,
-                  tmp_aspect[[2]] + no_legax,
+plot_list <- list(tmp_dem[[1]] + no_xax,
+                  tmp_dem[[2]] + no_xax,
+                  tmp_aspect[[1]] + no_xax,
+                  tmp_aspect[[2]] + no_xax,
                   tmp_slope[[1]],
-                  tmp_slope[[2]] + no_legyax)
-plot_grid(plotlist = plot_list, nrow = 3, ncol = 2)
-gg_save("patch_lonlat_demall", destination_dir = dir_modis)
+                  tmp_slope[[2]])
+wrap_plots(plot_list, nrow = 3, ncol = 2, axes = "collect") +
+  plot_layout(widths = c(1, 1), heights = c(1, 1, 1))
+gg_save("patch_lonlat_demall", destination_dir = dir_modis, set_theme = FALSE)
 
 
 plt_dem <- ggplot() +
@@ -331,8 +338,10 @@ rm(list = ls(pattern = "^tmp"))
 rm(list = ls(pattern = "^plt"))
 gc()
 
-plot_rast_agg("evi", crs, dir_modis)
-plot_rast_agg("lai", crs, dir_modis)
+if (!no_time) {
+  plot_rast_agg("evi", crs, dir_modis)
+  plot_rast_agg("lai", crs, dir_modis)
+}
 #-------------------------------- Landcover ------------------------------------
 plot_and_save_lc <- function(type) {
   filename <- paste0("LC_Type", type)
@@ -442,5 +451,5 @@ wrap_plots(plt_road_network,
            plt_road_rast_hist,
            plt_road_rast_hist_trafo,
            nrow = 2, ncol = 2) +
-  plot_layout(widths = c(1, 1), heights = c(1, 1))
+  plot_layout(widths = c(1, 1), heights = c(1, 1), guides = "collect")
 gg_save("patch_road", destination_dir = dir_misc)

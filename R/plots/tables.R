@@ -7,8 +7,6 @@ source("R/utils/geo_comp.R")
 #-------------------------------------------------------------------------------
 conf <- get_conf()
 crs <- st_crs(read_conf(conf, "crs"))
-
-
 #-------------------------------------------------------------------------------
 fires <- read_geodata(sf_crs = crs, filename = "calfire")
 fires <- fires |>
@@ -39,7 +37,31 @@ st_join(fires, ecoz, join = st_intersects, left = TRUE) |>
     style = cell_text(weight = "bold"),
     locations = list(
       cells_body(columns = Total),
-      cells_body(rows = month == "Total")))
+      cells_body(rows = month == "Total"))) |>
+  as_latex() |> cat()
+# Better use:
+# \begin{landscape}
+# \begin{longtable}{l|rrrrrrrrrrrrrr}
+# \caption{Counts per Ecoregion} \label{tab:ecoregion} \\
+# \toprule
+#  & \rot{Southern CA/Baja Coast} & \rot{Klamath/North Coast} & \rot{Central CA Foothills \& Coast} & \rot{Central Valley} & \rot{Sierra Nevada} & \rot{Cascades} & \rot{Central Basin \& Range} & \rot{Eastern Cascades Slopes} & \rot{Sonoran Basin} & \rot{Southern CA Mountains} & \rot{Northern Basin \& Range} & \rot{Mojave Basin} & \rot{Coast Range} & \rot{Total} \\
+# \midrule
+# \endfirsthead
+# \multicolumn{15}{l}{\small\itshape (continued from previous page)} \\
+# \toprule
+#  & \rot{Southern CA/Baja Coast} & \rot{Klamath/North Coast} & \rot{Central CA Foothills \& Coast} & \rot{Central Valley} & \rot{Sierra Nevada} & \rot{Cascades} & \rot{Central Basin \& Range} & \rot{Eastern Cascades Slopes} & \rot{Sonoran Basin} & \rot{Southern CA Mountains} & \rot{Northern Basin \& Range} & \rot{Mojave Basin} & \rot{Coast Range} & \rot{Total} \\
+# \midrule
+# \endhead
+# \midrule
+# \multicolumn{15}{r}{\small\itshape continued on next page} \\
+# \endfoot
+# \bottomrule
+# \endlastfoot
+# \addlinespace[2.5pt]
+# \multicolumn{15}{l}{2004} \\[2.5pt]
+# \midrule\addlinespace[2.5pt]
+# .....
+
 
 
 fires |>
@@ -49,5 +71,7 @@ fires |>
   st_drop_geometry() |>
   count(year, month) |>
   pivot_wider(names_from = month, values_from = n, values_fill = 0) |>
-  arrange(year, month)
+  adorn_totals(where = c("row", "col")) |>
+  gt() |>
+  as_latex() |> cat()
   
