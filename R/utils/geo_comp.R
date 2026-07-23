@@ -75,3 +75,16 @@ get_point_from_raster <- function(sf_points, raster) {
 
 }
 
+
+#'
+#'
+#'
+#'
+get_mainland <- function(sf_frame) {
+  
+  polys <- st_cast(st_geometry(sf_frame), "POLYGON")
+  areas <- st_area(polys)
+  mainland <- polys[which.max(areas)]
+  st_geometry(sf_frame) <- st_sfc(mainland, crs = st_crs(sf_frame))
+  sf_frame
+}
