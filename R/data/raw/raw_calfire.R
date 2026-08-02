@@ -5,13 +5,11 @@ library(fs)
 library(yaml)
 #-------------------------------------------------------------------------------
 source(path(here(), "R", "utils", "data_queries.R"))
-conf <- get_conf()
-#-------------------------------------------------------------------------------
+config <- read_yaml()
+url_calfire <- config[["calfire"]][["url"]]
 dir_destination <- path(here(), "data", "raw")
 dir_create(dir_destination)
-
-# TODO: validity checks
-#where <- paste0("YEAR_ >= ", read_conf(conf, "start_year"), " AND ", "YEAR_ <=", read_conf(conf, "end_year"))
-fire_layer <- esri2sf(read_conf(conf, "url_fires"))
+#-------------------------------------------------------------------------------
+calfire <- esri2sf(url_calfire)
 calfire_destination<- path(dir_destination, "calfire.gpkg")
-st_write(fire_layer, calfire_destination, append = FALSE)
+st_write(calfire, calfire_destination, append = FALSE)

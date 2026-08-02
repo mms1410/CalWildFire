@@ -12,10 +12,10 @@ crs <- st_crs(read_conf(conf, "crs"))
 categorical <- FALSE
 tif_files <- dir_ls(path("data", "preprocessed"), regexp = "\\.tif$", recurse = TRUE)
 destination_dir <- path("data", "preprocessed")
+# world geodetic system projection for longitude and latitude values
 crs_destination <- st_crs(4326)
-km_res <- 2 #2km resulution
+km_res <- 2 # desired resolution in km
 #-------------------------------------------------------------------------------
-#tif_files <- c("data/preprocessed/slope_NASADEM_HGT.tif" , "data/preprocessed/tmax.tif",  "data/preprocessed/vpdmax.tif")
 for (tif_file in tif_files) {
   filename <- str_extract(basename(tif_file), pattern = "(.*)(?=.tif)")
   message(paste0("Process raster ", filename, "..."))
@@ -23,7 +23,6 @@ for (tif_file in tif_files) {
   categorical <- all(is.factor(raster))
   method <- ifelse(categorical, "near", "bilinear")
   source_crs <- crs(raster, describe = TRUE)
-  # assure  geographic crs for lon/lat
   if(source_crs$authority != "EPSG" || source_crs$code != 4326) {
     message(paste0("   reproject source crs " , source_crs$name, " into destination crs ", crs_destination$input, "..."))
     raster <- project(raster, "EPSG:4326", method = method)
@@ -32,7 +31,7 @@ for (tif_file in tif_files) {
   current_resolution <- res(raster)[1]
   if (current_resolution < target_resolution) {
     message(paste0("   Current resolution ", current_resolution, " is smaller than ~", km_res, "km (deg) resolution..."))
-    template <- rast(ext(raster), resolution = target_resolution, crs = crs(raster)) #1km
+    template <- rast(ext(raster), resolution = target_resolution, crs = crs(raster))
     raster <- resample(raster, template, method = method)
     tmpFiles(current = FALSE, orphan = TRUE, remove = TRUE)
     rm(template); gc()

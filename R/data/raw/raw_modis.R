@@ -6,10 +6,10 @@ library(dotenv)
 library(appeears)
 #-------------------------------------------------------------------------------
 source("R/utils/data_queries.R")
-conf <- get_conf()
-apeears <- read_conf(conf, "appeears")
-crs <- st_crs(read_conf(conf, "crs"))
-ca <- read_sf_frame(keyword = "ca_state", sf_crs = crs)
+config <- read_yaml()
+apeears <- config[["modis"]][["appeears"]]
+crs <- st_crs(config[["crs"]])
+ca <- read_geodata(keyword = "ca_state", sf_crs = crs)
 ca_bbox <- ca |> st_transform(4326) |> st_bbox() |> as.numeric()
 #-------------------------------------------------------------------------------
 dotenv::load_dot_env()
@@ -19,8 +19,8 @@ checkmate::assert("EARTHDATA_PASSWORD" %in% names(Sys.getenv()),
                   "Expected to find 'EARTHDATA_PASSWORD' in environment to login at appeears")
 rs_set_key(user = Sys.getenv("EARTHDATA_USER"), password = Sys.getenv("EARTHDATA_PASSWORD"))
 
-query_start <- paste0(read_conf(conf, "start_year"), "-01", "-01")
-query_end <- paste0(read_conf(conf, "end_year"), "-12", "-31")
+query_start <- paste0(config[["start_year"]], "-01", "-01")
+query_end <- paste0(config[["end_year"]], "-12", "-31")
 #-------------------------------------------------------------------------------
 # info:
 # available products => rs_products()

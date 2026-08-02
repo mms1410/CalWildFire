@@ -16,12 +16,9 @@ dir_dest <- path(here(), "data", "preprocessed")
 dir_create(dir_dest)
 categorical <- FALSE
 #-------------------------------------------------------------------------------
-modis_variables <- "landcover"
 for (variable in modis_variables) {
-  
   folder <- modis_folders[[variable]]
   categorical <- ifelse(variable == "landcover", TRUE, FALSE)
-  
   if (!dir_exists(folder)) {
     message(paste0("Folder '", folder, "' does not exist (skip)"))
     next
@@ -55,7 +52,7 @@ for (variable in modis_variables) {
     raster_total <- rast(filenames_yrs)
     filename_total <- path(dir_dest, paste0(variable, "_", layer, ".tif"))
     if (categorical) {
-      # categorical rasters store additional data
+      # categorical rasters store additional data, create extra folder
       dir_create(path(dirname(filename_total), layer))
       filename_total <- path(dirname(filename_total), layer, paste0(layer, ".tif"))
     } 
@@ -66,7 +63,6 @@ for (variable in modis_variables) {
     sapply(to_delete, function(file) file_delete(file))
   }
 }
-
 dem_file <- dir_ls(dir_dest, regexp = "dem_.+\\.tif$", recurse = TRUE)
 tif_dem <- rast(dem_file)
 slope <- terra::terrain(tif_dem, "slope")
