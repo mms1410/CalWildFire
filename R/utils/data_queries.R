@@ -14,20 +14,12 @@ library(tidyverse)
 #' @param source_dir
 #' 
 #'
-get_conf <- function(filename = "data", source_dir = path(here(), "conf")) {
+read_yaml <- function(filename = "data", source_dir = path(here(), "conf")) {
   file <- path(source_dir, paste0(filename, ".yaml"))
   checkmate::assertFile(file)
   yaml::read_yaml(file)
 }
 
-
-#' Read conf entry
-#'
-#'
-read_conf <- function(conf, key) {
-  checkmate::assert(key %in% names(conf))
-  conf[[key]]
-}
 
 #' Read simple-feature data frame
 #'
