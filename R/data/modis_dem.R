@@ -1,0 +1,15 @@
+library(here)
+library(fs)
+library(tidyverse)
+library(sf)
+library(terra)
+#-------------------------------------------------------------------------------
+source("R//utils.R")
+source("R/const.R")
+#-------------------------------------------------------------------------------
+dem_file <- dir_ls(dir_dest, regexp = "dem_.+\\.tif$", recurse = TRUE)
+tif_dem <- rast(dem_file)
+slope <- terra::terrain(tif_dem, "slope")
+aspect <- terra::terrain(tif_dem, "aspect")
+writeRaster(slope, sub("dem", "slope", dem_file), overwrite = TRUE)
+writeRaster(aspect, sub("dem", "aspect", dem_file), overwrite = TRUE)
