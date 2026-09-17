@@ -1,0 +1,19 @@
+dtolerance: 2000
+default_grid:
+  samplesize: 800
+  max_edge_inner: [70e3, 85e3]
+  max_edge_outer: 90e3
+  offset_inner: 5e3
+  offset_outer: 8e3
+  cutoff: [10e3, 15e3]
+  spatialrange: 2500
+# vs:
+#    max_edge_inner: 80e3
+# ppt:
+#    max_edge_inner: 75e3
+#    max_edge_outer: 100e3
+#    cutoff: [10e3, 15e3, 20e3]
+# vpdmax:
+#    max_edge_inner: 90e3
+#    max_edge_outer: 120e3
+#    cutoff: [10e3, 15e3, 20e3]   
