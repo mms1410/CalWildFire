@@ -3,40 +3,36 @@ library(here)
 library(sf)
 library(terra)
 #-------------------------------------------------------------------------------
-#source(path(here(), "R", "utils", "data_queries.R"))
+source("R/const.R")
+url_ca_road <- CONF$caltrans$url
 destination_dir <- path(here(), "data")
 dir_create(destination_dir)
-config <- read_yaml()
-crs <- st_crs(config[["crs"]])
-url_ca_road <- config[["caltrans"]][["url"]]
+spat_res <- CONF$caltrans$grid_res_km * 1000
 #-------------------------------------------------------------------------------
 roads <- st_read(url_ca_road)
-roads <- st_transform(roads, crs)
-ca <- read_geodata(keyword = "ca_state", sf_crs = crs)
-roads <- st_intersection(roads, ca)
+roads <- st_transform(roads, CRS)
+roads <- st_intersection(roads, CA)
 
-## data contains linestrings and multilinestring but terra expects one type only
-## therefore cast linestring to multilinestring
-
-roads <- st_cast(roads, "MULTILINESTRING")
-if (st_crs(roads)$IsGeographic) stop("Error: The CRS is geographic (degrees). Need a projected CRS that uses meters (e.g., California Albers or UTM).")
+roads <- st_cast(roads, "MULTILINESTRING") # cast linestring to multilinestring to have only one geom
 roads_vect <- vect(roads)
-ca <- read_geodata(keyword = "ca_state", sf_crs = crs)
-ca_vect <- vect(ca)
-grid <- rast(ext(ca_vect), res = 2000, crs = crs$wkt)
-rast_road_density <- rasterizeGeom(roads_vect, grid, fun = "length")
-cell_area_km2 <- prod(res(grid)) / 1e6
-rast_road_density <- (rast_road_density) / cell_area_km2
+ca_vect <- vect(CA)
+
+grid <- rast(ca_vect, res = spat_res)
+rast_length <- rasterizeGeom(roads_vect, grid, fun = "length") # Length per cell (in metres)
+cell_area_km2 <- prod(res(grid)) / 1e6 # unit [m] assumed
+rast_road_density <- rast_length / cell_area_km2
 rast_road_density <- mask(rast_road_density, ca_vect)
-plot(rast_road_density)
-hist(rast_road_density)
+
+# grid <- rast(ext(ca_vect), res = spat_res, crs = CRS$wkt)
+# rast_road_density <- rasterizeGeom(roads_vect, grid, fun = "length")
+# cell_area_km2 <- prod(res(grid)) / 1e6
+# rast_road_density <- (rast_road_density) / cell_area_km2
+# rast_road_density <- mask(rast_road_density, ca_vect)
+
 rast_log <- log1p(rast_road_density)
 min_val <- global(rast_log, "min", na.rm = TRUE)[1,1]
 max_val <- global(rast_log, "max", na.rm = TRUE)[1,1]
 rast_normalized <- (rast_log - min_val) / (max_val - min_val)
-plot(rast_normalized)
-hist(values(rast_normalized))
 
-writeRaster(rast_road_density,
-            filename = path(destination_dir, "road_density.tif"),
-            overwrite = TRUE)
+write_sf(roads, path(destination_dir, "roads.gpkg"), overwrite = TRUE)
+writeRaster(rast_road_density, path(destination_dir, "road_density.tif") ,overwrite = TRUE)

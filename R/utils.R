@@ -129,7 +129,7 @@ readYaml <- function(filename = "data", source_dir = NULL) {
   
   if (file_ext(filename) == "") {
     filename <- paste0(filename, ".yaml")
-  } else if (!file_ext(fileanme) %in% c("yaml", "yml")) {
+  } else if (!(file_ext(filename) %in% c("yaml", "yml"))) {
      stop("Can read yaml files only")
   }
   if (dirname(filename) == ".")
@@ -145,37 +145,44 @@ readYaml <- function(filename = "data", source_dir = NULL) {
 #' @param sf_frame spatial data frame
 #' @aparam n nth largest polygon to maintain (defaults to one)
 #'
-cropMainland <- function(dataset) {
-  checkmate::assert(inherits(dataset, "SpatRaster") || inherits(dataset, "sf"))
+cropMainland <- function(geodata, mask_mainland, destination) {
+  checkmate::assert(inherits(geodata, "SpatRaster") || inherits(geodata, "sf"))
+  checkmate::assert(inherits(mask_mainland, "sf"))
   
-  if (inherits(dataset, "sf")) {
-    # Cast to POLYGON and keep only the single largest feature by area
-    dataset <- dataset |>
-      sf::st_cast("POLYGON", warn = FALSE) |>
-      dplyr::mutate(tmp_area = sf::st_area(geometry)) |>
-      dplyr::slice_max(tmp_area, n = 1, with_ties = FALSE) |>
-      dplyr::select(-tmp_area)
-    
-  } else if (inherits(dataset, "SpatRaster")) {
-    # If a custom spatial mask is provided, use it; otherwise fetch California
-    if (is.null(mask)) {
-      mask <- USAboundaries::us_states(states = "California", resolution = "high")
-    }
-    
-    ca_mask <- mask |>
-      sf::st_transform(terra::crs(dataset)) |>
-      sf::st_cast("POLYGON", warn = FALSE) |>
-      dplyr::mutate(tmp_area = sf::st_area(geometry)) |>
-      dplyr::slice_max(tmp_area, n = 1, with_ties = FALSE)
-    ca_mask <- vect(ca_mask)
-    
-    # Mask and crop the SpatRaster to the mainland boundary
-    dataset <- terra::crop(dataset, ca_mask)
-    dataset <- terra::mask(dataset, ca_mask)
-    terra::tmpFiles(current = TRUE, orphan = TRUE, remove = TRUE)
+  mask_mainland <- st_transform(mask_mainland, crs(geodata))
+  
+  if (inherits(geodata, "sf")) {
+    # select largest polygon
+    geodata <- st_make_valid(geodata)
+    geodata <- st_intersection(geodata, mask_mainland)
+  } else if (inherits(geodata, "SpatRaster")) {
+    mask_mainland <- vect(mask_mainland)
+    geodata <- terra::crop(geodata, mask_mainland)
+    geodata <- terra::mask(geodata, mask_mainland)
   }
+  return(geodata) 
+}
+
+
+getResKm <- function(raster) {
+  checkmate::assertClass(raster, "SpatRaster")
   
-  return(dataset) 
+  st_crs <- sf::st_crs(raster)
+  crs_units <- st_crs$units
+  res_raster <- res(raster)[1]
+  if (sf::st_is_longlat(st_crs)) {
+    ## Geographic (degrees) - convert to km
+    ## 1 degree ≈ 111.32 km
+    res_km <- res_raster * 111.32
+  } else{
+    if (crs_units == "metre" || crs_units == "m") {
+      ## m to km
+      res_km <- res_raster/ 1000
+    } else {
+      stop(paste0("Unknown/not implemented crs units ", crs_units))
+    }
+  }
+  return(res_km)
 }
 
 
@@ -197,6 +204,8 @@ aggSpatTemp <- function(raster, tmp_res = NULL, spat_res = NULL, func_tmp = NULL
   checkmate::assertNumeric(spat_res, null.ok = TRUE)
   checkmate::assertFunction(func_tmp, null.ok = TRUE)
   checkmate::assertFunction(func_spat, null.ok = TRUE)
+  
+  raster_agg <- raster
   if (!is.null(tmp_res)){
     checkmate::assert(has.time(raster))
     source_dates <- time(raster)
@@ -215,29 +224,45 @@ aggSpatTemp <- function(raster, tmp_res = NULL, spat_res = NULL, func_tmp = NULL
   }
   
   ## spatial aggregation
-  if(!is.null(spat_res)){
-    ## check rectangular grid and spatial unit
-    checkmate::assert(res(raster)[1] == res(raster)[2])
-    crs_info <- crs(raster)
-    rast_res <- res(raster)[1]
-    if (grepl("metre", crs_info,, ignore.case = TRUE)) {
-      rast_res_km <- rast_res / 1000
-    } else if (grepl("degree", crs_string, ignore.case = TRUE)) {
-      rast_res_km <- rast_res * 111 # 40,000km / 360deg ~~ 111.1km
-    } else {
-      stop("Cannot determine units of CRS ")
-    }
-    agg_fact <- round(spat_res / rast_res_km) # number of cells in each direction
-    rast_dest <- terra::aggregate(raster, fact = agg_fact, fun = func_spat)
+  spat_res_source <- getResKm(raster)
+  if(!is.null(spat_res) & (spat_res_source < spat_res)){
+    agg_fact <- round(spat_res / spat_res_source) # number of cells in each direction
+    raster_agg <- terra::aggregate(raster_agg, fact = agg_fact, fun = func_spat)
   }
   
   ## temporal aggregation
-  if(!is.null(tmp_res)) {
+  tmp_res_source <- as.numeric(min(diff(time(raster))))
+  if((!is.null(tmp_res)) && (tmp_res_source < tmp_res)) {
     chunk_breaks <- seq(min(source_dates), max(source_dates) + tmp_res,
                        by = paste(tmp_res, "days"))
     chunk_idx <- as.numeric(cut(source_dates, breaks = chunk_breaks))
-    rast_dest <- terra::tapp(raster, index = chunk_idx, fun = func_tmp)
-    #TODO: names and time
+    raster_agg <- terra::tapp(raster_agg, index = chunk_idx, fun = func_tmp)
+    
+    dates_agg <- seq(min(source_dates), by = paste(tmp_res, "days"), 
+                     length.out = terra::nlyr(raster_agg))
+    terra::time(raster_agg) <- dates_agg
+    names(raster_agg) <- dates_agg
   }
- return(rast_dest)
+ return(raster_agg)
 }
+
+replaceDefault <- function(config, var_name) {
+  
+  if (!(var_name %in% names(config))) {
+    return(config$default)
+  }
+  result <- config$default
+  new <- config[[var_name]]
+  names_intersect <- intersect(names(result), names(new))
+  new_names <- setdiff(names(new), names(result))
+  new_values <- new[new_names]
+  result[names_intersect] <- new[names_intersect]
+  result <- append(result, new_values)
+  return(result)
+}
+
+subset_raster <- function(raster, date_start, date_end) {
+  idx <- which(terra::time(raster) >= date_start & terra::time(raster) <= date_end)
+  raster[[idx]]
+}
+
