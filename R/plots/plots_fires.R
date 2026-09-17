@@ -21,9 +21,9 @@ plt_args_ecoz <- list(alpha = 0.4)
 plt_dir <-path(here(), "assets", "plots", "fire")
 dir_create(plt_dir)
 #-------------------------------------------------------------------------------
-fires <- read_file("calfire.gpkg", CRS)
-barea <- read_file("burntarea.gpkg", CRS)
-ca_ecoz  <- read_file("ecoz.gpkg", CRS)
+fires <- readFile("calfire.gpkg", CRS)
+barea <- readFile("burntarea.gpkg", CRS)
+ca_ecoz  <- readFile("ecoz.gpkg", CRS)
 
 gg_fire <- list(do.call(geom_sf,
                         c(list(data = transmute(fires, year = lubridate::year(date))),
@@ -72,7 +72,6 @@ gifski(dir_ls(plt_dir, regexp = "point_fires_\\d{4}"),
        width = 800,
        height = 600)
 
-
 ggplot() +
   gg_ca +
   geom_sf(data = fires, aes(color = log1p(area)), size = 0.1, alpha = 0.7) +
@@ -89,6 +88,7 @@ plt_point_fires_total_ecoz <- ggplot() +
   xlab("Longitude") +
   ylab("Latitude") +
   guides(fill = guide_legend(nrow = 5, ncol = 3, byrow = TRUE))
+plt_point_fires_total_ecoz
 gg_save("point_fires_total_ecoz", plt = plt_point_fires_total_ecoz, destination_dir = plt_dir)
 
 plt_ts_fire_counts_m <- fires |>
@@ -100,6 +100,7 @@ plt_ts_fire_counts_m <- fires |>
   geom_col(aes(x = ym, y = n)) +
   xlab("Time") +
   ylab("count")
+plt_ts_fire_counts_m
 gg_save("ts_fire_counts_m", plt = plt_ts_fire_counts_m, destination_dir = plt_dir)
 
 # TODO: y-axis count
@@ -115,6 +116,7 @@ plt_ts_fire_barea_m <- fires |>
   scale_fill_manual(name = "", values = c("Burnt Area" = "grey", "Count" = "red")) +
   guides(fill = guide_legend(reverse = TRUE)) +
   labs(y = "log(area+1), count", x = "Time")
+plt_ts_fire_barea_m
 gg_save("ts_fire_barea_m",plt = plt_ts_fire_barea_m, destination_dir = plt_dir)
 
 plt_ts_cummulative_count_d <- fires |>
@@ -126,6 +128,7 @@ plt_ts_cummulative_count_d <- fires |>
   ggplot() +
   geom_line(aes(x = date, y= cumcount)) +
   labs(x = "Time", y = "cummulative counts")
+plt_ts_cummulative_count_d
 gg_save("ts_cummulative_count_d",plt = plt_ts_cummulative_count_d, destination_dir = plt_dir)
 
 plot_grid(plt_point_fires_barea_total + theme(aspect.ratio = 1),
@@ -159,6 +162,7 @@ plt_heat_fires_count <- fires |>
   labs(x = "Month", y = "Year") +
   scale_fill_viridis_c(name = "Count", na.value = "gray90") +
   theme(panel.grid = element_blank(), legend.direction = "vertical")
+plt_heat_fires_count
 gg_save("heat_fires_count",plt = plt_heat_fires_count, destination_dir = plt_dir)
 
 wrap_plots(plt_point_fires_total_ecoz,
@@ -201,3 +205,24 @@ plot_grid(plot_grid(plt_ts_cummulative_count_d + theme(aspect.ratio = 1,plot.mar
                     nrow = 1, ncol = 2),
           nrow = 2, ncol = 1, rel_heights = c(1, 0.1))
 gg_save("patch_cumcount_countbarea_heat_point", destination_dir = plt_dir)
+#-------------------------------------------------------------------------------
+CA_MLD <- CA |>
+  cropMainland()
+
+barea <- st_make_valid(barea)
+barea_outside_parts <- st_difference(barea, CA)
+
+ggplot() +
+    geom_sf(data = CA) +
+    geom_sf(data = barea_outside_parts, color = "red", fill = "red")
+
+
+
+
+CA_poly <- st_cast(CA, "POLYGON")
+nrow(CA_poly)          # how many individual polygons?
+plot(st_geometry(CA_poly))
+
+
+ggplot() +
+  geom_sf(data = CA_poly, aes(fill = as.factor(row_number(CA_poly))))
