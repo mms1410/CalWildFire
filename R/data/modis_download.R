@@ -5,10 +5,13 @@ library(sf)
 library(dotenv)
 library(appeears)
 #-------------------------------------------------------------------------------
-source("R/const.R")
-apeears <- CONF[["modis"]][["appeears"]]
-destination_dir <- path(here(), "data", "raw")
-dir_create(destination_dir)
+source("R/utils.R")
+config <- readYaml("data")
+cal <- readFile(path(getwd(), "data", "assets", "cal.gpkg"))
+start_year <- config$start_year
+end_year <- config$end_year
+apeears <- config$modis$appeears
+destination_dir <- dir_create(path(getwd(), "data", "raw"))
 #-------------------------------------------------------------------------------
 dotenv::load_dot_env()
 checkmate::assert("EARTHDATA_USER" %in% names(Sys.getenv()),
@@ -16,8 +19,8 @@ checkmate::assert("EARTHDATA_USER" %in% names(Sys.getenv()),
 checkmate::assert("EARTHDATA_PASSWORD" %in% names(Sys.getenv()),
                   "Expected to find 'EARTHDATA_PASSWORD' in environment to login at appeears")
 rs_set_key(user = Sys.getenv("EARTHDATA_USER"), password = Sys.getenv("EARTHDATA_PASSWORD"))
-query_start <- paste0(CONF[["start_year"]], "-01", "-01")
-query_end <- paste0(CONF[["end_year"]], "-12", "-31")
+query_start <- paste0(start_year, "-01", "-01")
+query_end <- paste0(end_year, "-12", "-31")
 #-------------------------------------------------------------------------------
 # info:
 # available products => rs_products()
@@ -46,7 +49,7 @@ for (item in names(apeears)) {
   
   task <- rs_build_task(
     df = query_frame,
-    roi = CA,
+    roi = cal,
     format = "geotiff")
   
   query_request <- rs_request(

@@ -1,27 +1,40 @@
-library(zoo)
 library(terra)
-library(sf)
-library(tidyverse)
 library(fs)
-library(here)
+library(lubridate)
 library(data.table)
 #-------------------------------------------------------------------------------
 source("R/utils.R")
-tif_files <- dir_ls(path("data"), regexp = "\\.tif$")
-destination_dir <- path(here(), "data", "tables")
-dir_create(destination_dir)
-spat_res <- 4 # x km spatial res
-tmp_res <-  3 # x day temporal res
+config <- readYaml("data")
+spat_res <- config$table_spat_res
+temp_res <- config$table_temp_res
+tif_files <- dir_ls(path(getwd(), "data", "preprocessed"), glob = "*.tif")
+destination_dir <- dir_create(path(getwd(), "data", "tables"))
 #-------------------------------------------------------------------------------
-#tif_file <- tif_files[4]
+cat(paste0("Create tables with ", spat_res, "km spatial resolution and ", temp_res, " day-steps\n"))
 for (tif_file in tif_files) {
-  filename <- str_extract(basename(tif_file), pattern = "(.*)(?=.tif)")
-  cat(paste0("Process raster ", filename, "...\n"))
+  # filename = variablename
+  variable_name <- path_ext_remove(basename(tif_file))
+  cat(paste0("Process ", variable_name, "...\n"))
+  raster <- terra::rast(tif_file)
   
-  raster <- rast(tif_file)
-  raster_agg <- aggSpatTemp(raster, tmp_res = tmp_res, spat_res = spat_res)
+  # layer = time
+  if ((nlyr(raster)) > 1) {
+    raster_agg <- aggSpatTemp(raster, tmp_res = temp_res, spat_res = spat_res)
+  } else {
+    raster_agg <- aggSpatTemp(raster, spat_res = spat_res)
+  }
   
-  dtbl_long <- as.data.table(raster_agg, xy = TRUE)
-  setnames(dtbl_long, 1:2, c("lon", "lat"))
-  fwrite(dtbl_long, path(destination_dir, paste0(filename, ".csv")))
+  dtbl_wide <- as.data.table(raster_agg, xy = TRUE)
+  setnames(dtbl_wide, 1:2, c("lon", "lat"))
+  
+  dtbl_long <- melt(dtbl_wide,
+                    id.vars = c("lon", "lat"),
+                    measure.vars = setdiff(names(dt), c("long", "lat")),
+                    variable.name = "date",
+                    value.name = "value")
+  dtbl_long[, date:= lubridate::ymd(date)]
+  
+  
+  fwrite(dtbl_long, path(destination_dir, paste0(variable_name, "_long.csv")))
+  fwrite(dtbl_wide, path(destination_dir, paste0(variable_name, "_wide.csv")))
 }

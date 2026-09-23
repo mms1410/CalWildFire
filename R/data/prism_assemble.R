@@ -3,12 +3,12 @@ library(checkmate)
 library(fs)
 library(here)
 #-------------------------------------------------------------------------------
-source("R/constants.R")
-prism_variables <- CONF[["prism"]][["variables"]]
-target_folders <- dir_ls(path(here(), "data", "raw", "prism"),
+source("R/utilss.R")
+config <- readYaml("data")
+prism_variables <- config$prism$variables
+prism_folders <- dir_ls(path(getwd(), "data", "raw", "prism"),
                          regexp = paste0(prism_variables, collapse = "|"))
-destination_dir <- path(here(), "data")
-dir_create(destination_dir)
+destination_dir <- path(here(), "data", "raw")
 #-------------------------------------------------------------------------------
 checkmate::assert(length(target_folders) == length(prism_variables))
 for (target_folder in target_folders) {

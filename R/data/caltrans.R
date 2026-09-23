@@ -4,10 +4,10 @@ library(sf)
 library(terra)
 #-------------------------------------------------------------------------------
 source("R/const.R")
-url_ca_road <- CONF$caltrans$url
-destination_dir <- path(here(), "data")
-dir_create(destination_dir)
-spat_res <- CONF$caltrans$grid_res_km * 1000
+config <- readYaml("data")
+ca_crs <- st_crs(config$crs)
+url_ca_road <- config$caltrans$url
+destination_dir <- dir_create(path(here(),"raw",  "data"))
 #-------------------------------------------------------------------------------
 roads <- st_read(url_ca_road)
 roads <- st_transform(roads, CRS)

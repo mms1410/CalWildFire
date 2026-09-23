@@ -1,17 +1,16 @@
-library(here)
 library(fs)
 library(tidyverse)
 library(sf)
 library(terra)
 #-------------------------------------------------------------------------------
 source("R//utils.R")
-source("R/const.R")
-modis_conf <- CONF$modis$appeears
+config <- readYaml("data")
+cal_crs <- st_crs(config$crs)
+modis_conf <- config$modis$appeears
 modis_items <- names(modis_conf)
-modis_folders <- sapply(modis_items, function(x) path(here(), "data", "raw", x))
+modis_folders <- sapply(modis_items, function(x) path(getwd(), "data", "raw", x))
 modis_layers <- sapply(modis_items, function(x) modis_conf[[x]][["layer"]])
-destination_dir <- path(here(), "data")
-dir_create(destination_dir)
+destination_dir <- path(getwd(), "data")
 #-------------------------------------------------------------------------------
 for (item in modis_items) {
   folder <- modis_folders[[item]]
@@ -36,8 +35,8 @@ for (item in modis_items) {
     terra::time(raster) <- dates
     
     cat("    Project crs....\n")
-    if(crs(raster) != CRS$wkt) 
-      raster <- project(raster, CRS$wkt)
+    if(crs(raster) != cal_crs$wkt) 
+      raster <- project(raster, cal_crs$wkt)
     writeRaster(raster, path(destination_dir, paste0(item, ".tif")), overwrite = TRUE)
     
     if (grepl("dem", item, ignore.case = TRUE)) {

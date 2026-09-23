@@ -2,14 +2,16 @@ library(esri2sf) # remotes::install_github("yonghah/esri2sf")
 library(sf)
 library(dplyr)
 library(lubridate)
-library(here)
 library(fs)
 #-------------------------------------------------------------------------------
-source(path(here(), "R", "const.R"))
-source(path(here(), "R", "utils.R"))
-calfire_url <- CONF$calfire$url
-destination_dir <- path(here(), "data")
-dir_create(destination_dir)
+source(path(getwd(), "R", "utils.R"))
+
+config <- readYaml("data")
+ca_crs <- st_crs(config$crs)
+start_year = config$start_year
+end_year = config$end_year
+calfire_url <- config$calfire$url
+destination_dir <- dir_create(path(getwd(), "raw", "data"))
 #-------------------------------------------------------------------------------
 calfire <- esri2sf(calfire_url)
 
@@ -23,7 +25,7 @@ fires <- calfire |>
          OBJECTIVE == "Suppression (Wildfire)",
          CAUSE != "Firefighter Training" | is.na(CAUSE)) |>
   st_make_valid() |>
-  st_transform(CRS) |>
+  st_transform(ca_crs) |>
   select(calfire_id = OBJECTID, date, cause = CAUSE, area = Shape__Area, length = Shape__Length, agency = AGENCY)
 
 # units: acres
