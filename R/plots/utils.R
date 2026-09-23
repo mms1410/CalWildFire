@@ -1,3 +1,4 @@
+suppressPackageStartupMessages({
 library(ggplot2)
 library(cowplot)
 library(gifski)
@@ -9,6 +10,7 @@ library(lubridate)
 library(sf)
 library(ggsci)
 library(magick)
+})
 #-------------------------------------------------------------------------------
 theme_set(theme_light())
 theme_ecoregion <- theme(
