@@ -4,6 +4,8 @@
 .Ruserdata
 .env
 
+
+assets/
 data/
 !R/data/
 assets/
