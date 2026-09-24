@@ -95,3 +95,15 @@ for (variable_name in variables) {
   dumpYaml(variable_configs, path(destination_variable, paste0("config.yaml")))
 }
 
+mesh_2d_default <- fm_mesh_2d(boundary = boundary_total,
+           crs = cal_crs,
+           n = 200,
+           max.n.strict = 250,
+           max.edge = c(80000, 90000))
+mesh_2d_default
+mesh_2d_default |> plot()
+mesh_2d_default |>
+  saveRDS(path(destination_dir, "mesh2d_default.rds"))
+
+
+           
