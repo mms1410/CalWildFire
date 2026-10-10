@@ -1,0 +1,25 @@
+name: w
+table: tmax_5km7d.csv
+n_sample: 100000
+mesh_spatial: mesh_spat_400.rds
+time_interval: 50
+args_bru_options:
+  strategy: gaussian
+  int.strategy: eb
+args_spde:
+  alpha: 2
+  prior.range: [50000, 0.5]
+  prior.sigma: [1, 0.05]
+args_component:
+  field_year:
+    model: rw1
+  field_month:
+    model: seasonal
+    season.length: 12
+  field_separable:
+    control.group:
+      model: ar1
+      hyper:
+        rho:
+          prior: pc.cor0
+          param: [0.5, 0.5] 
