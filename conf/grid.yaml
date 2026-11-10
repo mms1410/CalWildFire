@@ -1,0 +1,4 @@
+spat_res_km: 5  # meters
+temp_res_d: 1     # days
+crs: 3310
+buffer_distance: -5000 # meters

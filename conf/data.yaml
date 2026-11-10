@@ -1,10 +1,5 @@
-start_year: 2004
-end_year: 2024
-crs: 3310 # WGS 84 <=> EPSG: 4326 is not projected
-#assets:
-#  url_ca_state: https://data.ca.gov/dataset/e212e397-1277-4df3-8c22-40721b095f33/resource/3db1e426-fb51-44f5-82d5-a54d7c6e188b/download/ca_state.zip
-#  url_ca_ecoz_l4: https://dmap-prod-oms-edc.s3.us-east-1.amazonaws.com/ORD/Ecoregions/ca/ca_eco_l4.zip
-#  url_ca_ecoz_l3: https://dmap-prod-oms-edc.s3.us-east-1.amazonaws.com/ORD/Ecoregions/ca/ca_eco_l3.zip
+coastline:
+  url: https://services9.arcgis.com/wwVnNW92ZHUIr0V0/arcgis/rest/services/Coastal_Zone_Boundary/FeatureServer/0
 ecoz:
   url: https://dmap-prod-oms-edc.s3.us-east-1.amazonaws.com/ORD/Ecoregions/ca/ca_eco_l3.zip
 calfire:
@@ -12,9 +7,8 @@ calfire:
 prism:
   url: https://data.prism.oregonstate.edu/time_series/us/an/800m/ 
   variables: [ppt, tmax, vpdmax]
-caltrans:
+caltran:
   url: https://caltrans-gis.dot.ca.gov/arcgis/rest/services/CHhighway/All_Roads/FeatureServer/0/query?outFields=*&where=1%3D1&f=geojson
-  grid_res_km: 4
 gridmet:
   url: https://www.northwestknowledge.net/metdata/data/
   variables: vs

@@ -1,0 +1,7 @@
+start_year: 2004
+end_year: 2024
+start_train: 2004
+end_train: 2023
+start_test: 2024
+end_test: 2024
+crs: 3310 # this is ca-albers projection, also: WGS 84 <=> EPSG: 4326

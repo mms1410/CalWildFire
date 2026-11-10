@@ -1,0 +1,36 @@
+tmax:
+  n_sample: 50000
+  mesh_temp: temp_mesh_k30d1_2016
+  mesh_spat: spat_mesh_2
+  data: tmax_stations.csv
+  prior_range: [350, 0.05]
+  prior_sigma: [5, 0.05]
+  prior_temp: [1, 0.5]
+  family: gaussian
+
+vpdmax:
+  n_sample: 50000
+  mesh_temp: temp_mesh_k30d1_2016
+  mesh_spat: spat_mesh_2
+  data: vpdmax_stations.csv
+  prior_range: [350, 0.05]
+  prior_sigma: [5, 0.05]
+  family: gaussian
+
+vs:
+  n_sample: 50000
+  mesh_temp: temp_mesh_k30d1_2016
+  mesh_spat: spat_mesh_2
+  data: vs_stations.csv
+  prior_range: [300, 0.05]
+  prior_sigma: [5, 0.05]
+  family: gaussian
+
+ppt:
+  n_sample: 50000
+  mesh_temp: temp_mesh_k30d1_2016
+  mesh_spat: spat_mesh_2
+  data: ppt_stations.csv
+  prior_range: [300, 0.05]
+  prior_sigma: [5, 0.05]
+  family: tweedie

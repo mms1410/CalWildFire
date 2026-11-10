@@ -1,0 +1,5 @@
+dir_prep: ["data", "preprocessed"]
+dir_raw: ["data", "raw"]
+dir_aux: ["data", "auxiliary"]
+dir_cache: ["data", "cache"]
+dir_fits: ["assets", "fits"]

@@ -1,0 +1,17 @@
+mesh_spatial:
+  tmax: spat_mesh_2
+  vpdmax: spat_mesh_2
+  integration: int_mesh_3
+
+mesh_temp:
+  tmax: temp_mesh_k10d1_2011
+  vpdmax: temp_mesh_k10d1_2011
+  integration: temp_mesh_k10d1_2011
+
+tmax:
+  data: 5km1d
+  n_sample: 50000
+
+vpdmax:
+  data: 5km1d
+  n_sample: 50000
