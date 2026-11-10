@@ -1,126 +1,162 @@
 library(fs)
-library(stringr)
 library(here)
+library(fmesher)
 library(sf)
-library(terra)
-library(tidyterra)
 library(ggplot2)
 library(patchwork)
-library(fmesher)
 #-------------------------------------------------------------------------------
-source("R/utils.R")
-source("R/plots/defaults.R")
-source("R/plots/utils.R")
-source("R/plots/plot_functions_mesh.R")
-source_dir_mesh <- path(getwd(), "assets", "mesh", "mesh2d")
-source_dir_rastsd <- path(getwd(), "assets", "tif_train")
-destination_dir <- dir_create(path(getwd(), "assets", "plots", "mesh2d"))
-spatial_range <- 5000
+source(path(here(), "R", "utils", "utils_io.R"))
+source(path(here(), "R", "utils", "utils_geocomp.R"))
+source(path(here(), "R", "utils", "utils_mesh.R"))
+source(path(here(), "R", "plots", "defaults.R"))
+source(path(here(), "R", "plots", "functions_mesh.R"))
 #-------------------------------------------------------------------------------
-for (variable_folder in dir_ls(source_dir_mesh)) {
-  variable_name <- basename(variable_folder)
-  if (variable_name == "fires") next
-  files_meshes <- dir_ls(variable_folder, glob = "*.rds")
-  files_pts <- dir_ls(variable_folder, glob = "*.gpkg")
-  meshes_split <- split(files_meshes, sub("_(sd|var)\\.rds$", "", basename(files_meshes)))
-  pts_split  <- split(files_pts,sub("_pts_(sd|var)\\.gpkg$", "", basename(files_pts))) 
+spat_meshes <- dir_ls(path(here(), "assets", "mesh"), regexp = "spat_mesh")
+int_meshes <- dir_ls(path(here(), "assets", "mesh"), regexp = "int_mesh_\\d.rds")
+
+destination_dir <- dir_create(here(), "assets", "plots", "mesh")
+ca_mld <- readFile("ca_mld.gpkg")
+crs_km <- calAlbersKm()
+mask <- getMainlandMask() |>
+  st_transform(crs_km)
+#-------------------------------------------------------------------------------
+plt_list_spat <- list()
+plt_list_mask <- list()
+plt_list_edge <- list()
+plt_list_std <- list()
+
+for (mesh_file in spat_meshes) {
   
-  if (variable_name != "fires") {
+  mesh_name <- basename(path_ext_remove(mesh_file))
+  mesh <- readFile(mesh_file)
+  mesh_config <- getMeshConfig(mesh_name)
+  mesh_info <- getMeshInfo(mesh)
+  config_info <-  paste(names(mesh_config), mesh_config, collapse = ", ", sep = ":")
+  
+  plt_mesh_spat <- ggplot() +
+    geom_sf(data = st_transform(ca_mld, crs_km), alpha = 0.4, color = "black", linewidth = 0.8) +
+    geom_fm(data = mesh, alpha = 0.7) +
+    labs(title = mesh_name,
+         subtitle = paste0(config_info, "\n", mesh_info))
+  plt_mesh_spat
+
+  range <- mesh_config$max.edge[[1]]
+  asses <- fm_assess(mesh, 150, 2) 
+  sd.dev.limits <- 1 + c(-1, 1) * max(abs(range(asses$sd.dev, na.rm = TRUE) - 1))
+  col.values <- 2 * seq(0, 1, length.out = 100) - 1
+  col.values <- (sign(col.values) * abs(col.values)^1.5 + 1) / 2
+  
+  # plots syntax from
+  # https://inlabru-org.github.io/fmesher/articles/variable_mesh_quality.html
+  
+  plt_edge <- ggplot() +
+    geom_tile(data = asses,
+              aes(geometry = geometry, fill = edge.len), stat = "sf_coordinates") +
+    coord_sf(default = TRUE) +
+    scale_fill_distiller(type = "seq",
+                         direction = 1,
+                         palette = 1,
+                         na.value = "transparent") +
+    geom_fm(data = mesh, fill = NA) +
+    labs(title = mesh_name,
+         subtitle = paste0(config_info, "\n", mesh_info))
+  plt_edge
+  
+  plt_std <- ggplot() +
+    geom_tile(data = asses,
+              aes(geometry = geometry, fill = sd.dev),
+              stat = "sf_coordinates") +
+    coord_sf(default = TRUE) +
+    scale_fill_distiller(type = "div",
+                         palette = "viridis",
+                         na.value = "transparent",
+                         limits = sd.dev.limits,
+                         values = col.values)
+  plt_std
     
-    cat(paste0("Create plots for ", variable_name, "\n"))
-    rast_sd <- terra::rast(path(source_dir_rastsd, paste0(variable_name, "_sd.tif")))
-    rast_var <- rast_sd^2
-    
-    destination_dir_variable <- dir_create(destination_dir, variable_name)
-    destination_rast <- dir_create(destination_dir_variable, "rast")
-    destination_mesh <- dir_create(destination_dir_variable, "mesh")
-    destination_qual <- dir_create(destination_dir_variable, "quality")
-    
-    for (mesh_name in names(meshes_split)) {
-      
-      mesh_sd <- readRDS(str_subset(meshes_split[[mesh_name]],"_sd\\.rds$"))
-      mesh_var <- readRDS(str_subset(meshes_split[[mesh_name]],"_var\\.rds$"))
-      pts_sd <- st_read(str_subset(pts_split[[mesh_name]], "_pts_sd.gpkg"))
-      pts_var <- st_read(str_subset(pts_split[[mesh_name]], "_pts_var.gpkg"))
-      mesh_config <- readYaml(dir_ls(path(variable_folder), glob = "*.yaml"))
-      
-      mesh_config <- mesh_config[[mesh_name]]
-      mesh_sd_info <- get_mesh_info(mesh_sd, mesh_config)
-      
-      mesh_var_info <- get_mesh_info(mesh_var, mesh_config)
-      sample_info <- paste0("(Samples: ",nrow(pts_sd), ")") # same vor sd and var
-      info_sample <- labs(caption = sample_info)
-      info_caption <- labs(caption = mesh_sd_info)
-      no_info <- labs(caption = NULL)
-      
-      plot_rast_sd <- ggplot() +
-        geom_spatraster(data = rast_sd) +
-        scale_fill_continuous(na.value = NA, name = expression(sigma[R])) +
-        geom_sf(data = pts_sd, color = "red", size = 0.4, alpha = 0.6) +
-        theme(legend.position = "left",
-              axis.text = element_blank()) + info_sample
-      
-      plot_rast_var <- ggplot() +
-        geom_spatraster(data = rast_var) +
-        scale_fill_continuous(na.value = NA, name = expression(sigma[R]^2)) +
-        geom_sf(data = pts_var, color = "red", size = 0.4, alpha = 0.6) +
-        theme(legend.position = "left",
-              axis.text = element_blank()) + info_sample
-      
-      plot_mesh_sd <- ggplot() +
-        geom_fm(data = mesh_sd) +
-        theme(axis.text = element_blank()) + info_caption
-      
-      plot_mesh_var <- ggplot() +
-        geom_fm(data = mesh_var) +
-        theme(axis.text = element_blank()) + info_caption
-      
-      plot_qual_sd <- plot_mesh_quality(mesh_sd, spatial_range) + info_caption
-      plot_qual_var <- plot_mesh_quality(mesh_var, spatial_range) + info_caption
-      
-      name_base <- paste0(variable_name,"_", mesh_name)
-      
-      gg_save(paste0(name_base, "_rast_sd"), plot_rast_sd,
-              destination_rast)
-      gg_save(paste0(name_base, "_rast_var"), plot_rast_var,
-              destination_rast)
-      gg_save(paste0(name_base, "_mesh_sd"), plot_mesh_sd,
-              destination_mesh)
-      gg_save(paste0(name_base, "_mesh_var"), plot_mesh_var,
-              destination_mesh)
-      gg_save(paste0(name_base, "_qual_sd"), plot_qual_sd,
-              destination_qual)
-      gg_save(paste0(name_base, "_qual_var"), plot_qual_var,
-              destination_qual)
-      
-      
-      plot_all <- wrap_plots(list(plot_rast_sd + no_info,
-                                  plot_rast_var + no_info,
-                                  plot_mesh_sd + no_info,
-                                  plot_mesh_var + no_info,
-                                  plot_qual_sd  + no_info,
-                                  plot_qual_var + no_info),
-                             nrow = 3, ncol = 2)
-      
-      gg_save(paste0(name_base, "_patch"), plot_all, destination_dir_variable)
-    }
-  } else {
-    fires <- readFile(path(getwd(), "data", "preprocessed", "calfire.gpkg"))
-    dir_fires <- dir_ls(source_dir_mesh, regexp = "fires")
-    files_meshes <- dir_ls(dir_fires, glob = "*.rds")
-    for (mesh_name_file in files_meshes) {
-     mesh <- readRDS(mesh_name_file) 
-     mesh_info <- get_mesh_info(mesh)
-     
-    plot_mesh <- ggplot() +
-      geom_fm(data = mesh, size = 1.5, color = "black", alpha = 0.7) +
-      geom_sf(data = fires, color = "red", size = 0.2, alpha = 0.4) +
-      theme(legend.position = "left",
-            axis.text = element_blank())
-    
-    #plot_mesh_qual <- plot_mesh_quality(mesh, spatial_range) +
-    #  labs(caption = mesh_var_info)
-    gg_save(paste0(variable_name,"_", mesh_name), plot_mesh, destination_dir)
-    }
-  }
+  ggsave(filename = paste0(mesh_name, ".png"),
+         path = destination_dir,
+         plot = plt_mesh_spat)
+  
+  plt_list_spat <- append(plt_list_spat, plt_mesh_spat)
+  
+  #-----------------------------------------------------------------------------
+  
+  nodes <- getMeshNodes(mesh)
+  nodes_masked <- maskMesh(mesh, mask)
+  
+  plt_mask <- ggplot() +
+    geom_sf(data = st_crop(mask, st_bbox(nodes)), fill = "brown", alpha = 0.5) +
+    geom_sf(data = ca_mld, alpha = 0.4) +
+    geom_sf(data = nodes, alpha = 0.9, color = "forestgreen", size = 0.8) +
+    geom_sf(data = nodes_masked$non_masked, color = "blue", size = 0.8) +
+    labs(title = mesh_name)
+  plt_mask
+  
+  ggsave(filename = paste0(mesh_name, "_mask.png"),
+         path = destination_dir,
+         plot = plt_mask)
+  
+  plt_list_mask <- append(plt_list_mask, plt_mask)
+}
+
+plt_spat_meshes <- patchwork::wrap_plots(plt_list_spat, ncol = 3)
+ggsave(filename = "patch_spat_meshes.png",
+       plot = plt_spat_meshes,
+       path = destination_dir)
+
+plt_mask_meshes <- patchwork::wrap_plots(plt_list_mask, ncol = 3)
+ggsave(filename = "patch_mask_meshes.png",
+       plot = plt_mask_meshes,
+       path = destination_dir)
+#-------------------------------------------------------------------------------
+# integration meshes:
+ca_mld <- readFile("cal_mld.gpkg") |>
+  st_transform(crs_km)
+
+for (mesh_file in int_meshes) {
+  
+  mesh_name <- basename(path_ext_remove(mesh_file))
+  mesh <- readRDS(mesh_file)
+  
+  voro_file <- paste0("voronoi_", mesh_name, ".gpkg")
+  voro <- readFile(voro_file)
+  pts <- readFile(paste0("pts_", mesh_name, ".gpkg"))
+  
+  sw <- sum(voro$spat_weight)
+  tex_sum <- bquote(sum(w[i]) == .(sw))
+  tex_leg <- bquote(w[i])
+  
+  plt_voro <- ggplot() +
+    geom_sf(data = voro, aes(fill = spat_weight)) +
+    geom_sf(data = pts, aes(color = "mesh vertex"), size = 0.4, alpha = 0.5) +
+    labs(title = paste0("Voronoi Tesselation  ", mesh_name),
+         subtitle = tex_sum,
+         fill = tex_leg) +
+    scale_color_manual(name = NULL,
+                       values = c("mesh vertex" = "red"))
+  plt_voro
+  ggsave(filename = paste0("voronoi_", mesh_name, ".png"),
+         path = destination_dir,
+         plot = plt_voro)
+  
+  #-----------------------------------------------------------------------------
+  mld_buffer = st_buffer(ca_mld, -2)
+  
+  plt_int_mesh <- ggplot() +
+    geom_fm(data = mesh, linewidth = 0.5, color = "black",
+            defs = list(bnd = list(alpha = 0.5, linewidth = 0.3, color = "white"),
+                        int = list(alpha = 0.5, color = "blue"),
+                        loc = list(alpha = 0.5, color = "red", size = 0.3))) +
+    geom_sf(data = mld_buffer, color = "green", fill = NA, size = 0.7)
+  plt_int_mesh
+  
+  ggsave(filename = paste0(mesh_name, ".png"),
+         path = destination_dir,
+         plot = plt_int_mesh)
+  
+  plt_voro_int <- wrap_plots(list(plt_int_mesh, plt_voro), ncol = 2)
+  ggsave(filename = paste0(mesh_name, "_voro.png"),
+         path = destination_dir,
+         plot = plt_voro_int)
 }

@@ -10,20 +10,28 @@ library(tidyterra)
 library(scales)
 library(units)
 library(dplyr)
+library(tinytable)
+library(rlang)
 #-------------------------------------------------------------------------------
 source("R/utils.R")
-source("R/const.R")
 source("R/plots/utils.R")
+source("R/plots/defaults.R")
+
+config <- readYaml("data")
+crs_cal <- st_crs(config$crs)
 plt_args_fire <- list(color = "black", shape = 19, size = 0.1, alpha = 0.6)
 plt_args_barea <- list(color = "grey", alpha = 0.8)
 plt_args_ca <- list(color = "grey", alpha = 0.3)
 plt_args_ecoz <- list(alpha = 0.4)
-plt_dir <-path(here(), "assets", "plots", "fire")
-dir_create(plt_dir)
+
+plt_dir <- dir_create(path("assets", "plots", "fires"))
+tbl_dir <- dir_create(path("assets", "tables"))
 #-------------------------------------------------------------------------------
-fires <- readFile("calfire.gpkg", CRS)
-barea <- readFile("burntarea.gpkg", CRS)
-ca_ecoz  <- readFile("ecoz.gpkg", CRS)
+fires <- readFile("calfire.gpkg")
+barea <- readFile("burntarea.gpkg")
+cal_ecoz  <- readFile("ecoz.gpkg")
+cal_mld <- readFile("cal_mld.gpkg")
+cal <- readFile("cal.gpkg")
 
 gg_fire <- list(do.call(geom_sf,
                         c(list(data = transmute(fires, year = lubridate::year(date))),
@@ -35,9 +43,24 @@ gg_ecoz <- list(do.call(geom_sf,
                                mapping = aes(fill = region)),
                           plt_args_fire)))
 gg_ca <- list(do.call(geom_sf,
-                      c(list(data = CA),
+                      c(list(data = cal_mld),
                       plt_args_ca)))
 #-------------------------------------------------------------------------------
+table_daily_counts <- fires |>
+  add_count(date, name = "daily_count") |>
+  add_count(year_count = lubridate::year(date), name = "year_count") |>
+  add_count(year_month = lubridate::floor_date(date, "month"), name = "year_month_count") |>
+  add_count(m = lubridate::month(date), name = "month_count") |>
+  select(daily_count, date) |>
+  group_by(daily_count) |>
+  summarize(first_occurrence = min(date, na.rm = TRUE),
+            last_occurrence  = max(date, na.rm = TRUE),
+            #time_span_days   = as.numeric(max(date, na.rm = TRUE) - min(date, na.rm = TRUE)),
+            n_days           = n_distinct(date),
+            .groups          = "drop") |>
+  arrange(desc(daily_count))
+st_write(table_daily_counts, path(tbl_dir, "table_daily_counts.gpkg"))
+
 ggplot() +
   gg_ca +
   gg_fire +
@@ -55,6 +78,7 @@ gg_save("point_fires_barea_total", plt = plt_point_fires_barea_total, destinatio
 for (yr in year(fires$date) |> unique()) {
   ggplot() +
     gg_ca +
+    gg_ecoz +
     do.call(geom_sf,
             c(list(data = filter(barea, lubridate::year(date) == yr)), plt_args_barea)) + 
     do.call(geom_sf,
@@ -66,6 +90,7 @@ for (yr in year(fires$date) |> unique()) {
     ggtitle(yr)
   gg_save(paste0("point_fires_", yr), destination_dir = plt_dir)
 }
+
 gifski(dir_ls(plt_dir, regexp = "point_fires_\\d{4}"),
        path(plt_dir, "point_fires.gif"),
        delay = 0.5,
@@ -90,6 +115,7 @@ plt_point_fires_total_ecoz <- ggplot() +
   guides(fill = guide_legend(nrow = 5, ncol = 3, byrow = TRUE))
 plt_point_fires_total_ecoz
 gg_save("point_fires_total_ecoz", plt = plt_point_fires_total_ecoz, destination_dir = plt_dir)
+
 
 plt_ts_fire_counts_m <- fires |>
   select(date) |>
@@ -206,23 +232,5 @@ plot_grid(plot_grid(plt_ts_cummulative_count_d + theme(aspect.ratio = 1,plot.mar
           nrow = 2, ncol = 1, rel_heights = c(1, 0.1))
 gg_save("patch_cumcount_countbarea_heat_point", destination_dir = plt_dir)
 #-------------------------------------------------------------------------------
-CA_MLD <- CA |>
-  cropMainland()
+#-------------------------------------------------------------------------------
 
-barea <- st_make_valid(barea)
-barea_outside_parts <- st_difference(barea, CA)
-
-ggplot() +
-    geom_sf(data = CA) +
-    geom_sf(data = barea_outside_parts, color = "red", fill = "red")
-
-
-
-
-CA_poly <- st_cast(CA, "POLYGON")
-nrow(CA_poly)          # how many individual polygons?
-plot(st_geometry(CA_poly))
-
-
-ggplot() +
-  geom_sf(data = CA_poly, aes(fill = as.factor(row_number(CA_poly))))

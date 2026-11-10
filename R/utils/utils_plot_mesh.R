@@ -1,3 +1,8 @@
+library(fmesher)
+library(ggplot2)
+
+#-------------------------------------------------------------------------------
+
 #'
 #'
 #'
@@ -78,3 +83,15 @@ plot_mesh_quality <- function(mesh, spatial_range) {
 }
 
 
+debugPlot <- function(spatial_mesh, ca_mld) {
+  
+  source("R/plots/defaults.R")
+  
+  info_string <- getMeshInfo(spatial_mesh)
+  
+  ggplot() +
+    geom_fm(data = spatial_mesh, defs = list(bnd = list(linewidth = 0.2)), fill = NA) +
+    geom_sf(data = ca_mld, fill = NA, color = "black") +
+    labs(subtitle = info_string) +
+    theme(plot.subtitle = element_text(size = 11))
+}
