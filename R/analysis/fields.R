@@ -77,8 +77,9 @@ if (file_exists(path(cache_dir, paste0(conf_spec, ".gpkg")))) {
 }
 #-------------------------------------------------------------------------------
 geodata <- geodata |>
-  mutate(value = (value - mean(value)) / sd(value),
+  mutate(value = if (variable_name == "ppt") {value} else { (value - mean(value)) / sd(value)},
          distance_coast = distance_coast)
+
 n_region <- length(unique(geodata$region))
 
 cmp_intercept <- initCmpIntercept(variable_name)
@@ -170,7 +171,3 @@ fit_220 <- bru(components = c(cmp_base, cmp_field_220),
 message("save model iDiff")
 saveModel(fit_220, "iDiff")
 #-------------------------------------------------------------------------------
-
-
-
-
