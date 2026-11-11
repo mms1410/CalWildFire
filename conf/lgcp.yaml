@@ -3,15 +3,17 @@ mesh_spatial:
   vpdmax: spat_mesh_2
   integration: int_mesh_3
 
-mesh_temp:
-  tmax: temp_mesh_k10d1_2011
-  vpdmax: temp_mesh_k10d1_2011
-  integration: temp_mesh_k10d1_2011
+mesh_temporal:
+  tmax: temp_mesh_k30d1_2016
+  vpdmax: temp_mesh_k30d1_2016
+  integration: temp_mesh_k10d1_2016
 
-tmax:
-  data: 5km1d
-  n_sample: 50000
+data:
+  tmax: tmax_stations.csv
+  vpdmax: vpdmax_stations.csv
 
-vpdmax:
-  data: 5km1d
-  n_sample: 50000
+n_sample: 5000
+
+warmstart:
+  tmax: fit_tmax_temp_mesh_k30d1_2016_spat_mesh_2_kron.rds
+  vpdmax: fit_vpdmax_temp_mesh_k30d1_2016_spat_mesh_2_kron.rds
