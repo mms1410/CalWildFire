@@ -94,21 +94,16 @@ initCmpWeek <- function(variable_name = "") {
 }
 #-------------------------------------------------------------------------------
 
-
-initKroneckerField <- function(variable_name) {
+initKroneckerSPDE <- function(mesh_spatial, prior_sigma, prior_range) {
   
-  checkmate::assertString(variable_name)
-  checkmate::assert(exists("spde_kron", envir = parent.frame()))
-  checkmate::assert(exists("mesh_temporal", envir = parent.frame()))
+  checkmate::assertNumeric(prior_range)
+  checkmate::assertNumeric(prior_sigma)
+  checkmate::assertClass(mesh_spatial, "fm_mesh_2d")
   
-  
-  suffix <- if (nzchar(variable_name)) paste0("_", variable_name) else ""
-  
-  form <- as.formula(sprintf("~ -1 + field_kron%s(main = geometry, model = spde_kron, group = time, group_mapper = bru_mapper(mesh_temporal))", suffix))  
-  
-  return(bru_comp_list(form))
+  return(inla.spde2.pcmatern(mesh_spatial,
+                     prior.sigma = prior_sigma,
+                     prior.range = prior_range))
 }
-
 
 
 #'
@@ -162,6 +157,50 @@ initInteratedDiffusionSPDE <- function(mesh_spatial, mesh_temporal, priors_list)
                              control.priors = priors_list)
   return(spde_220)
 }
+
+#-------------------------------------------------------------------------------
+
+initCmpKroneckerField <- function(variable_name, mesh_temporal, spde) {
+  
+  checkmate::assertString(variable_name)
+  checkmate::assertClass(mesh_temporal, "fm_mesh_1d")
+  checkmate::assertClass(spde, "inla.spde2")
+  
+  suffix <- if (nzchar(variable_name)) paste0("_", variable_name) else ""
+  var_name_mesh <- deparse(substitute(mesh_temporal))
+  var_name_spde <- deparse(substitute(spde))
+  
+  form <- as.formula(sprintf("~ -1 + field_kron%s(main = geometry,
+                                model = %s,
+                                group = time,
+                                group_mapper = bru_mapper(%s))", suffix, var_name_spde, var_name_mesh))
+  return(bru_comp_list(form))
+}
+
+# initCmpKroneckerField <- function(variable_name, spde_name = "") {
+#   
+#   checkmate::assertString(variable_name)
+#   checkmate::assertString(spde_name)
+#   
+#   suffix <- if (nzchar(variable_name)) paste0("_", variable_name) else ""
+#   if (spde_name == "") {
+#     checkmate::assert(exists(paste0("spde_kron"), envir = parent.frame()))
+#     group_mapper = "bru_mapper(mesh_temporal)"
+#   } else {
+#     checkmate::assert(exists(spde_name, envir = parent.frame()))
+#   }
+#   
+#   
+#   checkmate::assert(exists(paste0("mesh_temporal", suffix), envir = parent.frame()))
+#   
+#   form <- as.formula(sprintf("~ -1 + field_kron%s(main = geometry,
+#                                 model = spde_kron%s,
+#                                 group = time,
+#                                 group_mapper = bru_mapper(mesh_temporal%s))", suffix, suffix, suffix))  
+#   
+#   return(bru_comp_list(form))
+# }
+
 
 
 #'
