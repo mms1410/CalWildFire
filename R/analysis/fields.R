@@ -77,7 +77,7 @@ if (file_exists(path(cache_dir, paste0(conf_spec, ".gpkg")))) {
 }
 #-------------------------------------------------------------------------------
 geodata <- geodata |>
-  mutate(value = if (variable_name == "ppt") {value} else { (value - mean(value)) / sd(value)},
+  mutate(value = if (variable_name == "ppt") {value} else {(value - mean(value)) / sd(value)},
          distance_coast = distance_coast)
 
 n_region <- length(unique(geodata$region))
@@ -97,35 +97,27 @@ spde_kron <- inla.spde2.pcmatern(mesh_spatial,
                                 prior.sigma = unlist(conf$prior_sigma),
                                 prior.range = unlist(conf$prior_range))
 
-cmp_field_kron <- initKroneckerField(variable_name)
-
-cmp_field_kron <- bru_comp_list(~ -1 + field_kron_vpdmax(main = geometry, 
-                                                  model = spde_kron,
-                                                  group = time,
-                                                  group_mapper = bru_mapper(mesh_temporal, indexed = TRUE),
-                                                  control.group = list(model = "ar1")))
+cmp_field_kron <- initCmpKroneckerField(variable_name, mesh_temporal, spde_kron)
 
 form <-  update(form_base, as.formula(sprintf("~. + field_kron_%s", variable_name)))
-fit_sep <- bru(components = c(cmp_base, cmp_field_kron),
-               bru_obs(formula = form_base,
+fit_kron <- bru(components = c(cmp_base, cmp_field_kron),
+               bru_obs(formula = form,
                        family = conf$family,
                        data = geodata))
 
 message("save model kron...")
-saveModel(fit_sep, "kron")
+saveModel(fit_kron, "kron")
 #-------------------------------------------------------------------------------
 priors_spacetime <- list(prs = unlist(conf$prior_range),
                          prt = unlist(conf$prior_temp),
                          psigma = unlist(conf$prior_sigma))
 #-------------------------------------------------------------------------------
 # separable diffusion
-
 spde_102 <- initSeperableSPDE(mesh_spatial, mesh_temporal, priors_spacetime)
 cmp_field_102 <- initCmpDiffusionField(variable_name, "102")
 
-form <- update(form_base, as.formula(sprintf("~. + field_102_%s", variable_name)))
 fit_102 <- bru(components = c(cmp_base, cmp_field_102),
-               bru_obs(formula = form,
+               bru_obs(formula = update(form_base, as.formula(sprintf("~. + field_102_%s", variable_name))),
                        family = conf$family,
                        data = geodata))
 
@@ -170,4 +162,3 @@ fit_220 <- bru(components = c(cmp_base, cmp_field_220),
 
 message("save model iDiff")
 saveModel(fit_220, "iDiff")
-#-------------------------------------------------------------------------------
