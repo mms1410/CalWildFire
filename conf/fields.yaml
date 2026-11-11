@@ -15,6 +15,7 @@ vpdmax:
   data: vpdmax_stations.csv
   prior_range: [350, 0.05]
   prior_sigma: [5, 0.05]
+  prior_temp: [1, .05]
   family: gaussian
 
 vs:
@@ -24,6 +25,7 @@ vs:
   data: vs_stations.csv
   prior_range: [300, 0.05]
   prior_sigma: [5, 0.05]
+  prior_temp: [1, .05]
   family: gaussian
 
 ppt:
@@ -33,4 +35,5 @@ ppt:
   data: ppt_stations.csv
   prior_range: [300, 0.05]
   prior_sigma: [5, 0.05]
+  prior_temp: [1, .05]
   family: tweedie
