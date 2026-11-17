@@ -1,6 +1,7 @@
 library(checkmate)
 library(INLA)
 library(inlabru)
+library(INLAspacetime)
 #-------------------------------------------------------------------------------
 
 #' Wrap 'Intercept' component into component list
@@ -76,7 +77,7 @@ initCmpBesag <- function(variable_name = "") {
   checkmate::assert(exists("graph_ecoz", envir = parent.frame()))
   
   suffix <- if (nzchar(variable_name)) paste0("_", variable_name) else ""
- 
+  
   form <- as.formula(sprintf("~ -1 + effect_region%s(region, model = 'besag', graph = graph_ecoz,constr = TRUE, scale.model = TRUE)", suffix))
   
   return(bru_comp_list(form))
@@ -101,8 +102,8 @@ initKroneckerSPDE <- function(mesh_spatial, prior_sigma, prior_range) {
   checkmate::assertClass(mesh_spatial, "fm_mesh_2d")
   
   return(inla.spde2.pcmatern(mesh_spatial,
-                     prior.sigma = prior_sigma,
-                     prior.range = prior_range))
+                             prior.sigma = prior_sigma,
+                             prior.range = prior_range))
 }
 
 
@@ -129,6 +130,7 @@ initCriticalDiffusionSPDE <- function(mesh_spatial, mesh_temporal, priors_list) 
                              control.priors = priors_list)
   return(spde_121)
 }
+
 
 #'
 #'
@@ -157,9 +159,7 @@ initInteratedDiffusionSPDE <- function(mesh_spatial, mesh_temporal, priors_list)
                              control.priors = priors_list)
   return(spde_220)
 }
-
 #-------------------------------------------------------------------------------
-
 initCmpKroneckerField <- function(variable_name, mesh_temporal, spde) {
   
   checkmate::assertString(variable_name)
@@ -177,47 +177,17 @@ initCmpKroneckerField <- function(variable_name, mesh_temporal, spde) {
   return(bru_comp_list(form))
 }
 
-# initCmpKroneckerField <- function(variable_name, spde_name = "") {
-#   
-#   checkmate::assertString(variable_name)
-#   checkmate::assertString(spde_name)
-#   
-#   suffix <- if (nzchar(variable_name)) paste0("_", variable_name) else ""
-#   if (spde_name == "") {
-#     checkmate::assert(exists(paste0("spde_kron"), envir = parent.frame()))
-#     group_mapper = "bru_mapper(mesh_temporal)"
-#   } else {
-#     checkmate::assert(exists(spde_name, envir = parent.frame()))
-#   }
-#   
-#   
-#   checkmate::assert(exists(paste0("mesh_temporal", suffix), envir = parent.frame()))
-#   
-#   form <- as.formula(sprintf("~ -1 + field_kron%s(main = geometry,
-#                                 model = spde_kron%s,
-#                                 group = time,
-#                                 group_mapper = bru_mapper(mesh_temporal%s))", suffix, suffix, suffix))  
-#   
-#   return(bru_comp_list(form))
-# }
-
-
-
 #'
-#'
-#'
-#'
-initCmpDiffusionField <- function(variable_name = "", model){
+initCmpDiffusionField <- function(variable_name = "", model, spde){
   
   
   checkmate::assertString(variable_name)
   checkmate::assertChoice(model, c("102", "121","202", "220"))
+  checkmate::assertClass(spde, "stModel_cgeneric")
   
-  spde_spec <- paste0("spde_", model)
-  checkmate::assert(exists(spde_spec, envir = parent.frame()))
-  
+  spde_spec <- deparse(substitute(spde))
   suffix <- if (nzchar(variable_name)) paste0("_", variable_name) else ""
-  field_spec <- paste0(model, suffix)
+  field_spec <- paste0(model,suffix)
   
   
   
