@@ -1,19 +1,37 @@
-mesh_spatial:
-  tmax: spat_mesh_2
-  vpdmax: spat_mesh_2
-  integration: int_mesh_3
+integration:
+  mesh_spat: spat_mesh_2.rds
+  mesh_temp: temp_mesh_k30d1_2016.rds
 
-mesh_temporal:
-  tmax: temp_mesh_k30d1_2016
-  vpdmax: temp_mesh_k30d1_2016
-  integration: temp_mesh_k10d1_2016
-
-data:
-  tmax: tmax_stations.csv
-  vpdmax: vpdmax_stations.csv
-
-n_sample: 5000
-
-warmstart:
-  tmax: fit_tmax_temp_mesh_k30d1_2016_spat_mesh_2_kron.rds
-  vpdmax: fit_vpdmax_temp_mesh_k30d1_2016_spat_mesh_2_kron.rds
+fields:
+  vpdmax:
+    data: vpdmax_stations.csv
+    mesh_spat: spat_mesh_2.rds
+    mesh_temp: temp_mesh_k30d1_2016.rds
+    prior_range: [700, 0.01]
+    prior_temp: [1, 0.5]
+    prior_sigma: [0.5, 0.05]
+    n_sample: 5000
+  tmax:
+    data: tmax_stations.csv
+    mesh_spat: spat_mesh_2.rds
+    mesh_temp: temp_mesh_k30d1_2016.rds
+    prior_range: [700, 0.01]
+    prior_temp: [1, 0.5]
+    prior_sigma: [0.5, 0.05]
+    n_sample: 5000
+  vs:
+    data: vs_stations.csv
+    mesh_spat: spat_mesh_2.rds
+    mesh_temp: temp_mesh_k30d1_2016.rds
+    prior_range: [700, 0.01]
+    prior_temp: [1, 0.5]
+    prior_sigma: [0.5, 0.05]
+    n_sample: 5000
+  ppt:
+    data: ppt_stations.csv
+    mesh_spat: spat_mesh_2.rds
+    mesh_temp: temp_mesh_k30d1_2016.rds
+    prior_range: [700, 0.01]
+    prior_temp: [1, 0.5]
+    prior_sigma: [0.5, 0.05]
+    n_sample: 5000
