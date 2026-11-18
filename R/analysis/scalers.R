@@ -18,3 +18,13 @@ scale_vs <- function(values) {
 scale_vpdmax <- function(values) {
   return(compute_z_score(values))
 }
+
+
+scale_variable <- function(value, variable_name) {
+  switch(variable_name,
+         "ppt"    = value,
+         "vs"     = scale_vs(value),
+         "tmax"   = scale_tmax(value),
+         "vpdmax" = scale_vpdmax(value),
+         stop(sprintf("no scaler implemented for variable %s", variable_name)))
+}

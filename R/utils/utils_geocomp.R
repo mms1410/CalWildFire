@@ -326,11 +326,11 @@ addCoastDistanceTbl <- function(dtbl, crs_dtbl, colname = "distance_coast") {
   checkmate::assert(all(c("x", "y") %in% colnames(dtbl)))
   
   sf_frame <- st_as_sf(dtbl[, .(x, y)], coords = c("x", "y"), crs = crs_dtbl)
-  values <- getCoastDistance(sf_frame)
+  values <- getCoastDistance(sf_frame) / 1000
   
   checkmate::assert(length(values) == nrow(dtbl))
-  dtbl[, (colname) := values]
-  
+  #dtbl[, (colname) := values]
+  data.table::set(dtbl, j = colname, value = values)
   return(dtbl)
 }
 

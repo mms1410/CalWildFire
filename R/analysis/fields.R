@@ -14,6 +14,7 @@ source(path(here(), "R", "utils", "utils_mesh.R"))
 source(path(here(), "R", "utils", "utils_analysis.R"))
 source(path(here(), "R", "utils", "utils_geocomp.R"))
 source(path(here(), "R", "analysis", "components.R"))
+source(path(here(), "R", "analysis", "scalers.R"))
 #-------------------------------------------------------------------------------
 set.seed(123)
 
@@ -22,24 +23,26 @@ variable_name <- args_commandline[1]
 
 checkmate::assertChoice(variable_name, c("ppt", "vpdmax", "tmax", "vs"))
 
-paths <- readYaml("paths")
-general <- readYaml("general")
 conf <- readYaml("fields")
 conf <- conf[[variable_name]]
 
+general <- readYaml("general")
 train_years <- seq(general$start_train, general$end_train)
 
-crs_km <- calAlbersKm()
 ecoz <- readFile("ecoz_mld.gpkg")
+region_idx <- readFile("adj_lookup.rds")
+n_region <- nrow(region_idx)
 graph_ecoz <- readFile("ecoz_mld.adj")
+crs_km <- calAlbersKm()
 
+paths <- readYaml("paths")
 destination_dir <- reduceYamlPath(paths$dir_fits)
 cache_dir <- reduceYamlPath(paths$dir_cache)
 data_dir <- reduceYamlPath(paths$dir_grid)
 #-------------------------------------------------------------------------------
 bru_options_set(verbose = TRUE,
                 bru_verbose = 3,
-                num.threads = "1:1",
+                num.threads = "2:2",
                 control.inla = list(strategy = "simplified.laplace", int.strategy = "ccd", diagonal = 1e-4),
                 control.compute = list(dic = TRUE, waic = TRUE, mlik = TRUE, config = TRUE))
 
@@ -67,30 +70,25 @@ if (file_exists(path(cache_dir, paste0(conf_spec, ".gpkg")))) {
   
   geodata <- geodata[sample(.N, conf$n_sample)] |>
     addEcozTbl(st_crs(ecoz), ecoz = ecoz) |>
+    left_join(region_idx, by = "region") |>
     addCoastDistanceTbl(st_crs(ecoz)) |>
     addRastToTbl(st_crs(ecoz), "dem.tif", "elevation") |>
     st_as_sf(coords = c("x", "y"), crs = st_crs(ecoz)) |>
     st_transform(crs_km) |>
-    mutate(time = as.numeric(date))
+    mutate(time = as.numeric(date),
+           value_scaled = scale_variable(value, variable_name))
 
   st_write(geodata, path(cache_dir, paste0(conf_spec, ".gpkg")), append = FALSE)
 }
 #-------------------------------------------------------------------------------
-geodata <- geodata |>
-  mutate(value = if (variable_name == "ppt") {value} else {(value - mean(value)) / sd(value)},
-         distance_coast = distance_coast)
-
-n_region <- length(unique(geodata$region))
-
 cmp_intercept <- initCmpIntercept(variable_name)
-cmp_elevation <- initCmpElevation(variable_name)
-cmp_coast_distance <- initCmpCoastDistance(variable_name)
-# TODO: int graph <-> char region
-# cmp_region <- initCmpBesag(variable_name)
+cmp_elevation <- initCmpElevation(variable_name, n_region)
+cmp_coast_distance <- initCmpCoastDistance(variable_name, n_region)
+cmp_region <- initCmpBesag(variable_name, graph_ecoz)
 
 cmp_base <- c(cmp_intercept, cmp_elevation, cmp_coast_distance)
 form_base <- reformulate(paste0(c("Intercept", "effect_elevation", "effect_coast_distance"), "_", variable_name),
-                         response = "value")
+                         response = "value_scaled")
 #-------------------------------------------------------------------------------
 # separable kronecker model
 spde_kron <- inla.spde2.pcmatern(mesh_spatial,
@@ -99,14 +97,16 @@ spde_kron <- inla.spde2.pcmatern(mesh_spatial,
 
 cmp_field_kron <- initCmpKroneckerField(variable_name, mesh_temporal, spde_kron)
 
-form <-  update(form_base, as.formula(sprintf("~. + field_kron_%s", variable_name)))
-fit_kron <- bru(components = c(cmp_base, cmp_field_kron),
+if (!file_exists(path(destination_dir, paste0(conf_spec, "_kron.rds")))) {
+  form <-  update(form_base, as.formula(sprintf("~. + field_kron_%s", variable_name)))
+  fit_kron <- bru(components = c(cmp_base, cmp_field_kron),
                bru_obs(formula = form,
                        family = conf$family,
                        data = geodata))
 
-message("save model kron...")
-saveModel(fit_kron, "kron")
+  message("save model kron...")
+  saveModel(fit_kron, "kron")
+}
 #-------------------------------------------------------------------------------
 priors_spacetime <- list(prs = unlist(conf$prior_range),
                          prt = unlist(conf$prior_temp),
@@ -116,49 +116,57 @@ priors_spacetime <- list(prs = unlist(conf$prior_range),
 spde_102 <- initSeperableSPDE(mesh_spatial, mesh_temporal, priors_spacetime)
 cmp_field_102 <- initCmpDiffusionField(variable_name, "102")
 
-fit_102 <- bru(components = c(cmp_base, cmp_field_102),
-               bru_obs(formula = update(form_base, as.formula(sprintf("~. + field_102_%s", variable_name))),
-                       family = conf$family,
-                       data = geodata))
-
-message("save model sDiff...")
-saveModel(fit_102, "sDiff")
+if (!file_exists(path(destination_dir, paste0(conf_spec, "_sDiff.rds")))) {
+  fit_102 <- bru(components = c(cmp_base, cmp_field_102),
+                 bru_obs(formula = update(form_base, as.formula(sprintf("~. + field_102_%s", variable_name))),
+                         family = conf$family,
+                         data = geodata))
+  
+  message("save model sDiff...")
+  saveModel(fit_102, "sDiff")
+}
 #-------------------------------------------------------------------------------
 # critical diffusion
 
 spde_121 <- initCriticalDiffusionSPDE(mesh_spatial, mesh_temporal, priors_spacetime)
 cmp_field_121 <- initCmpDiffusionField(variable_name, "121")
 
-fit_121 <- bru(components = c(cmp_base, cmp_field_121),
+if (!file_exists(path(destination_dir, paste0(conf_spec, "_cDiff.rds")))) {
+  fit_121 <- bru(components = c(cmp_base, cmp_field_121),
                bru_obs(formula = update(form_base, as.formula(sprintf("~. + field_121_%s", variable_name))),
                        family = conf$family,
                        data = geodata))
-
-message("save model cDiff...")
-saveModel(fit_121, "cDiff")
+  message("save model cDiff...")
+  saveModel(fit_121, "cDiff")
+}
 #-------------------------------------------------------------------------------
 # separable diffusion order2
 
 spde_202 <- initSperable2SPDE(mesh_spatial, mesh_temporal, priors_spacetime)
 cmp_field_202 <- initCmpDiffusionField(variable_name, "202")
 
-fit_202 <- bru(components = c(cmp_base, cmp_field_202),
+
+if (!file_exists(path(destination_dir, paste0(conf_spec, "_s2Diff.rds")))) {
+  fit_202 <- bru(components = c(cmp_base, cmp_field_202),
                bru_obs(formula = update(form_base, as.formula(sprintf("~. + field_202_%s", variable_name))),
                        family = conf$family,
                        data = geodata))
 
-message("save model s2Diff")
-saveModel(fit_202, "s2Diff")
+  message("save model s2Diff")
+  saveModel(fit_202, "s2Diff")
+}
 #-------------------------------------------------------------------------------
 # iterated diffusion
 
 spde_220 <- initInteratedDiffusionSPDE(mesh_spatial, mesh_temporal, priors_spacetime)
 cmp_field_220 <- initCmpDiffusionField(variable_name, "220")
 
-fit_220 <- bru(components = c(cmp_base, cmp_field_220),
+if (!file_exists(path(destination_dir, paste0(conf_spec, "_iDiff.rds")))) {
+  fit_220 <- bru(components = c(cmp_base, cmp_field_220),
                bru_obs(formula = update(form_base, as.formula(sprintf("~. + field_220_%s", variable_name))),
                        family = conf$family,
                        data = geodata))
 
-message("save model iDiff")
-saveModel(fit_220, "iDiff")
+  message("save model iDiff")
+  saveModel(fit_220, "iDiff")
+}
