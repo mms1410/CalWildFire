@@ -2,7 +2,7 @@
 
 destination_dir: [assets, mesh]
 
-boundary:
+spat_mesh_boundary:
   convex: [80, 200]
   resolution: [40, 55]
   buffer_dist: -10
@@ -28,3 +28,6 @@ spat_mesh_4:
 spat_mesh_5:
   max.edge: [30, 80]
   offset: [100, 400]
+
+int_mesh_1:
+  

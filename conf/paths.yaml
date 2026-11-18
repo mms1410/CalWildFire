@@ -3,3 +3,6 @@ dir_raw: ["data", "raw"]
 dir_aux: ["data", "auxiliary"]
 dir_cache: ["data", "cache"]
 dir_fits: ["assets", "fits"]
+dir_plots: ["assets", "plots"]
+dir_mesh: ["assets", "mesh"]
+
