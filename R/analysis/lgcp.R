@@ -257,46 +257,44 @@ cmp_vs <- c(cmp_intercept_vs,
             cmp_coast_distance_vs,
             cmp_field_102_vs)
 
-obs_model_tmax <- bru_obs(value ~ Intercept_tmax + effect_elevation_tmax + effect_coast_distance_tmax + field_tmax,
+obs_model_tmax <- bru_obs(value_scaled ~ Intercept_tmax + effect_elevation_tmax + effect_coast_distance_tmax + field_tmax,
                           family = "gaussian",
-                          data = tmax)
+                          data   = tmax)
 
-obs_model_vpdmax <- bru_obs(value ~ Intercept_vpdmax + effect_elevation_vpdmax + effect_coast_distance_vpdmax + field_vpdmax,
+obs_model_vpdmax <- bru_obs(value_scaled ~ Intercept_vpdmax + effect_elevation_vpdmax + effect_coast_distance_vpdmax + field_vpdmax,
                             family = "gaussian",
-                            data = vpdmax)
+                            data   = vpdmax)
 
 obs_model_ppt <- bru_obs(value ~ Intercept_ppt + effect_elevation_ppt + effect_coast_distance_ppt + field_ppt,
                          family = "tweedie",
                          data = ppt)
 
-obs_model_vs <- bru_obs(value ~ Intercept_vs + effect_elevation_vs + effect_coast_distance_vs + field_vs,
+obs_model_vs <- bru_obs(value_scaled ~ Intercept_vs + effect_elevation_vs + effect_coast_distance_vs + field_vs,
                         family = "gamma",
-                        data = vs)
+                        data   = vs)
 #===============================================================================
 #                           Components Intensity
 #===============================================================================
 cmp_intercept <- initCmpIntercept()
 cmp_lai <- bru_comp_list(~ -1 + effect_lai(lai, model = "linear"))
 cmp_evi <- bru_comp_list(~ -1 + effect_evi(evi, model = "linear"))
+
 cmp_intercept_mark <- initCmpIntercept("mark")
 
+cmp_lgcp <- c(cmp_vs, cmp_intercept_mark, cmp_intercept, cmp_lai, cmp_evi)
 
-cmp_lgcp <- c(cmp_ppt, cmp_tmax, cmp_vs, cmp_intercept, cmp_lai, cmp_evi, cmp_intercept_mark)
+obs_model_lgcp <-  bru_obs(formula = geometry + time ~  Intercept + effect_evi + effect_lai  + field_vs  + field_tmax,
+                           family  = "cp",
+                           data    = fires,
+                           ips     = ips)
 
-obs_model_lgcp <-  bru_obs(formula = geometry + time ~  Intercept + effect_evi + effect_lai + field_ppt + field_tmax + field_vs,
-                           family = "cp",
-                           data = fires,
-                           ips = ips)
-
-obs_model_mark <- bru_obs(formula = area_scaled ~ Intercept_mark + effect_evi + effect_lai + field_ppt + field_tmax + field_vs,
+obs_model_mark <- bru_obs(formula = area_scaled ~ Intercept_mark + effect_evi + effect_lai,
                           family  = "gaussian",
                           data    = fires)
 
-
 fit_lgcp <- bru(cmp_lgcp,
                 obs_model_lgcp,
-                obs_model_ppt,
-                obs_model_tmax,
+                obs_model_mark,
                 obs_model_vs)
            
-saveModel(fit_lgcp, "lgcp_1")
+saveModel(fit_lgcp, "lgcp_vs_tmax")

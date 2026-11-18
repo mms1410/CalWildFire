@@ -25,13 +25,11 @@ initCmpIntercept <- function(variable_name = "", prec = 1e-3) {
 #'
 #' @param variable_name This name will be added to the component to be able to differentiate between, say, 'effect_elevation_tmax' vs. 'effect_elevation_vpdmax'
 #'
-initCmpElevation <- function(variable_name = "") {
-  
-  checkmate::assert(exists("n_region", envir = parent.frame()))
+initCmpElevation <- function(variable_name = "", n_regions) {
   
   suffix <- if (nzchar(variable_name)) paste0("_", variable_name) else ""
   
-  form <- as.formula(sprintf("~ -1 + effect_elevation%s(elevation, replicate = region, n = n_region, model = 'rw2', scale.model = TRUE, constr = TRUE)", suffix))
+  form <- as.formula(sprintf("~ -1 + effect_elevation%s(elevation, replicate = region, n = %d, model = 'rw2', scale.model = TRUE, constr = TRUE)", suffix, n_regions))
   return(bru_comp_list(form))
 }
 
@@ -39,62 +37,29 @@ initCmpElevation <- function(variable_name = "") {
 #'
 #' @param variable_name This name will be added to the component to be able to differentiate between, say, 'effect_coast_distance_tmax' vs. 'effect_coast_distance_vpdmax'
 #'
-initCmpCoastDistance <- function(variable_name = "") {
-  
-  checkmate::assert(exists("n_region", envir = parent.frame()))
+initCmpCoastDistance <- function(variable_name = "", n_regions) {
   
   suffix <- if (nzchar(variable_name)) paste0("_", variable_name) else ""
   
-  form <- as.formula(sprintf("~ -1 + effect_coast_distance%s(distance_coast, replicate = region, n = n_region, model = 'rw2', scale.model = TRUE, constr = TRUE)", suffix))
+  form <- as.formula(sprintf("~ -1 + effect_coast_distance%s(distance_coast, replicate = region, n = %d, model = 'rw2', scale.model = TRUE, constr = TRUE)", suffix, n_regions))
   return(bru_comp_list(form))
 }
 
-#' Wrap 'effect_region_iid' into component list
 #'
-#' @param variable_name This name will be added to the component to be able to differentiate between, say, 'effect_coast_distance_tmax' vs. 'effect_coast_distance_vpdmax'
 #'
-initCmpRegionIID <- function(variable_name = "") {
+#'
+#'
+initCmpBesag <- function(variable_name = "", adj_graph) {
+  
+  adj_name <- deparse(substitute(adj_graph))
   
   suffix <- if (nzchar(variable_name)) paste0("_", variable_name) else ""
   
-  form <- as.formula(sprintf("~ -1 + effect_region%s(region, model = 'iid')", suffix))
-  return(bru_comp_list(form))
-}
-
-initCmpRegionBYM <- function(variable_name = "") {
-  
-  checkmate::assert(exists("graph_ecoz", envir = parent.frame()))
-  
-  suffix <- if (nzchar(variable_name)) paste0("_", variable_name) else ""
-  
-  form <- as.formula(sprintf("~ -1 + effect_region%s(region, model = 'bym2', graph = graph_ecoz, constr = TRUE, scale.model = TRUE)", suffix))
-  
-  return(bru_comp_list(form))
-}
-
-initCmpBesag <- function(variable_name = "") {
-  
-  checkmate::assert(exists("graph_ecoz", envir = parent.frame()))
-  
-  suffix <- if (nzchar(variable_name)) paste0("_", variable_name) else ""
-  
-  form <- as.formula(sprintf("~ -1 + effect_region%s(region, model = 'besag', graph = graph_ecoz,constr = TRUE, scale.model = TRUE)", suffix))
-  
-  return(bru_comp_list(form))
-}
-
-initCmpWeek <- function(variable_name = "") {
-  
-  checkmate::assertString(variable_name)
-  
-  suffix <- if (nzchar(variable_name)) paste0("_", variable_name) else ""
-  
-  form <- as.formula(sprintf("~ -1 + effect_week%s(week, model = 'rw2', cyclic = TRUE, scale.model = TRUE, constr = TRUE)", suffix))
+  form <- as.formula(sprintf("~ -1 + effect_region%s(region, model = 'besag', graph = %s,constr = TRUE, scale.model = TRUE)", suffix, adj_name))
   
   return(bru_comp_list(form))
 }
 #-------------------------------------------------------------------------------
-
 initKroneckerSPDE <- function(mesh_spatial, prior_sigma, prior_range) {
   
   checkmate::assertNumeric(prior_range)
